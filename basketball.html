@@ -5,146 +5,105 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>3v3 街頭籃球</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    background: #1a1a2e;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    font-family: 'Arial Black', sans-serif;
-    color: #fff;
-    overflow: hidden;
-  }
-  #ui-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 900px;
-    padding: 8px 16px;
-    background: rgba(0,0,0,0.6);
-    border-radius: 12px 12px 0 0;
-    border: 2px solid #f4a020;
-    border-bottom: none;
-  }
-  .score-box { text-align: center; }
-  .score-box .label { font-size: 12px; color: #aaa; letter-spacing: 2px; }
-  .score-box .score { font-size: 36px; color: #f4a020; line-height: 1; }
-  .score-box.enemy .score { color: #e44; }
-  #timer-box { text-align: center; }
-  #timer-box .label { font-size: 11px; color: #aaa; }
-  #timer-box .time { font-size: 28px; color: #fff; }
-  #shot-clock { font-size: 13px; color: #f4a020; text-align:center; margin-top:2px; }
-  #quarter-box { font-size: 13px; color: #ccc; text-align:center; }
-  canvas {
-    display: block;
-    border: 2px solid #f4a020;
-    border-top: none;
-    border-bottom: none;
-    cursor: none;
-  }
-  #ui-bottom {
-    width: 900px;
-    padding: 8px 16px;
-    background: rgba(0,0,0,0.6);
-    border-radius: 0 0 12px 12px;
-    border: 2px solid #f4a020;
-    border-top: 1px solid #444;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 13px;
-    color: #ccc;
-  }
-  #controls-hint span { margin-right: 12px; }
-  #controls-hint b { color: #f4a020; }
-  #diff-box { display: flex; gap: 8px; align-items: center; }
-  #diff-box span { font-size: 12px; color: #888; }
-  .diff-btn {
-    padding: 4px 12px;
-    border-radius: 6px;
-    border: 1px solid #555;
-    background: #222;
-    color: #ccc;
-    cursor: pointer;
-    font-size: 12px;
-    transition: all 0.2s;
-  }
-  .diff-btn:hover { border-color: #f4a020; color: #f4a020; }
-  .diff-btn.active { background: #f4a020; color: #000; border-color: #f4a020; font-weight: bold; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:#1a1a2e;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  min-height:100vh;
+  font-family:'Arial Black',sans-serif;
+  color:#fff; overflow:hidden;
+  user-select:none;
+}
+#ui-top {
+  display:flex; align-items:center; justify-content:space-between;
+  width:900px; padding:8px 18px;
+  background:rgba(0,0,0,0.65);
+  border-radius:12px 12px 0 0;
+  border:2px solid #f4a020; border-bottom:none;
+}
+.score-box { text-align:center; min-width:100px; }
+.score-box .label { font-size:11px; color:#aaa; letter-spacing:2px; }
+.score-box .score { font-size:40px; color:#f4a020; line-height:1; }
+.score-box.enemy .score { color:#e44; }
+.score-box .target { font-size:11px; color:#888; margin-top:2px; }
+#mid-box { text-align:center; }
+#shot-clock-display { font-size:13px; color:#f4a020; margin-top:3px; }
+#goal-display { font-size:12px; color:#ccc; margin-top:2px; }
+canvas {
+  display:block;
+  border:2px solid #f4a020; border-top:none; border-bottom:none;
+  cursor:none; outline:none;
+}
+#ui-bottom {
+  width:900px; padding:7px 16px;
+  background:rgba(0,0,0,0.65);
+  border-radius:0 0 12px 12px;
+  border:2px solid #f4a020; border-top:1px solid #333;
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:12px; color:#ccc;
+}
+#controls-hint span { margin-right:10px; }
+#controls-hint b { color:#f4a020; }
+.diff-btn {
+  padding:4px 11px; border-radius:6px;
+  border:1px solid #555; background:#222; color:#ccc;
+  cursor:pointer; font-size:12px; transition:all 0.15s;
+  font-family:inherit;
+}
+.diff-btn:hover { border-color:#f4a020; color:#f4a020; }
+.diff-btn.active { background:#f4a020; color:#000; border-color:#f4a020; font-weight:bold; }
 
-  /* Overlay screens */
-  #overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.85);
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    z-index: 100;
-  }
-  #overlay h1 { font-size: 48px; color: #f4a020; text-shadow: 0 0 20px #f4a020; margin-bottom: 8px; }
-  #overlay h2 { font-size: 24px; color: #fff; margin-bottom: 32px; }
-  #overlay .big-score { font-size: 64px; color: #fff; margin-bottom: 24px; }
-  #overlay .big-score .s1 { color: #f4a020; }
-  #overlay .big-score .s2 { color: #e44; }
-  .menu-btn {
-    padding: 12px 40px;
-    font-size: 18px;
-    border-radius: 10px;
-    border: 2px solid #f4a020;
-    background: transparent;
-    color: #f4a020;
-    cursor: pointer;
-    margin: 6px;
-    font-family: inherit;
-    font-weight: bold;
-    transition: all 0.2s;
-    letter-spacing: 1px;
-  }
-  .menu-btn:hover { background: #f4a020; color: #000; }
-  #message-box {
-    position: fixed;
-    top: 120px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0,0,0,0.85);
-    padding: 10px 30px;
-    border-radius: 20px;
-    border: 2px solid #f4a020;
-    font-size: 20px;
-    color: #f4a020;
-    font-weight: bold;
-    z-index: 50;
-    pointer-events: none;
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  #power-bar-wrap {
-    position: fixed;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 140px;
-    width: 160px;
-    display: none;
-    flex-direction: column;
-    align-items: center;
-    z-index: 50;
-  }
-  #power-label { font-size: 13px; color: #f4a020; margin-bottom: 4px; }
-  #power-bar-bg {
-    width: 160px; height: 16px;
-    background: #333;
-    border-radius: 8px;
-    border: 1px solid #555;
-    overflow: hidden;
-  }
-  #power-bar {
-    height: 100%;
-    background: linear-gradient(90deg, #4ef, #f4a020, #e44);
-    width: 0%;
-    border-radius: 8px;
-    transition: width 0.05s;
-  }
+/* ── Overlay ── */
+#overlay {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.88);
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; z-index:100;
+}
+#overlay h1 { font-size:52px; color:#f4a020; text-shadow:0 0 24px #f4a020; margin-bottom:6px; }
+#overlay h2 { font-size:22px; color:#fff; margin-bottom:28px; }
+.row-opts { display:flex; gap:8px; margin-bottom:14px; align-items:center; }
+.row-opts span { font-size:13px; color:#888; margin-right:4px; }
+.big-score { font-size:64px; color:#fff; margin-bottom:20px; }
+.big-score .s1 { color:#f4a020; }
+.big-score .s2 { color:#e44; }
+.menu-btn {
+  padding:12px 42px; font-size:18px; border-radius:10px;
+  border:2px solid #f4a020; background:transparent; color:#f4a020;
+  cursor:pointer; margin:6px; font-family:inherit; font-weight:bold;
+  transition:all 0.2s; letter-spacing:1px;
+}
+.menu-btn:hover { background:#f4a020; color:#000; }
+
+/* ── Message ── */
+#msg {
+  position:fixed; top:115px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.88); padding:8px 28px; border-radius:20px;
+  border:2px solid #f4a020; font-size:20px; color:#f4a020; font-weight:bold;
+  z-index:50; pointer-events:none; opacity:0; transition:opacity 0.3s;
+  white-space:nowrap;
+}
+
+/* ── Power bar ── */
+#pw-wrap {
+  position:fixed; left:50%; transform:translateX(-50%); bottom:135px;
+  width:170px; display:none; flex-direction:column; align-items:center; z-index:50;
+}
+#pw-label { font-size:12px; color:#f4a020; margin-bottom:4px; }
+#pw-bg { width:170px; height:15px; background:#333; border-radius:8px; border:1px solid #555; overflow:hidden; }
+#pw-fill { height:100%; background:linear-gradient(90deg,#4ef,#f4a020,#e44); width:0%; border-radius:8px; }
+
+/* ── Cooldown indicators ── */
+#cd-box {
+  position:fixed; right:calc(50% - 450px + 8px); bottom:138px;
+  display:none; flex-direction:column; gap:4px; z-index:50;
+}
+.cd-row { display:flex; align-items:center; gap:6px; font-size:12px; color:#ccc; }
+.cd-key { width:22px; height:22px; background:#333; border:1px solid #555; border-radius:4px;
+  display:flex; align-items:center; justify-content:center; font-weight:bold; color:#f4a020; font-size:11px; }
+.cd-bar-bg { width:70px; height:7px; background:#333; border-radius:4px; overflow:hidden; }
+.cd-bar-fill { height:100%; background:#4ef; border-radius:4px; transition:width 0.05s; }
 </style>
 </head>
 <body>
@@ -152,51 +111,60 @@
 <div id="ui-top">
   <div class="score-box">
     <div class="label">我方</div>
-    <div class="score" id="score-player">0</div>
+    <div class="score" id="sp">0</div>
+    <div class="target" id="tp"></div>
   </div>
-  <div>
-    <div id="timer-box">
-      <div class="label">剩餘時間</div>
-      <div class="time" id="timer">3:00</div>
-    </div>
-    <div id="shot-clock">投籃時限: <span id="shot-num">24</span>s</div>
-    <div id="quarter-box" style="display:none"></div>
+  <div id="mid-box">
+    <div style="font-size:11px;color:#aaa;text-align:center;">投籃時限</div>
+    <div style="font-size:30px;color:#fff;text-align:center;line-height:1" id="sc">24</div>
+    <div id="goal-display"></div>
   </div>
   <div class="score-box enemy">
     <div class="label">對手</div>
-    <div class="score" id="score-enemy">0</div>
+    <div class="score" id="se">0</div>
+    <div class="target" id="te"></div>
   </div>
 </div>
 
-<canvas id="c" width="900" height="520"></canvas>
+<canvas id="c" width="900" height="520" tabindex="0"></canvas>
 
 <div id="ui-bottom">
   <div id="controls-hint">
     <span><b>WASD</b> 移動</span>
     <span><b>空白</b> 傳球</span>
-    <span><b>J</b> 投籃/上籃</span>
-    <span><b>K</b> 搶球/防守</span>
+    <span><b>J</b> 投籃</span>
+    <span><b>K</b> 換人</span>
+    <span><b>Z</b> 搶斷</span>
+    <span><b>X</b> 封阻</span>
+    <span><b>C</b> 干擾</span>
   </div>
-  <div id="diff-box">
-    <span>難度：</span>
+  <div style="display:flex;gap:6px;align-items:center">
+    <span style="font-size:11px;color:#888">難度：</span>
     <button class="diff-btn active" data-diff="easy">簡單</button>
     <button class="diff-btn" data-diff="medium">中度</button>
     <button class="diff-btn" data-diff="hard">困難</button>
   </div>
 </div>
 
-<div id="message-box"></div>
-
-<div id="power-bar-wrap">
-  <div id="power-label">投籃力道</div>
-  <div id="power-bar-bg"><div id="power-bar"></div></div>
+<div id="msg"></div>
+<div id="pw-wrap"><div id="pw-label">投籃力道</div><div id="pw-bg"><div id="pw-fill"></div></div></div>
+<div id="cd-box">
+  <div class="cd-row"><div class="cd-key">Z</div><span>搶斷</span><div class="cd-bar-bg"><div class="cd-bar-fill" id="cd-z"></div></div></div>
+  <div class="cd-row"><div class="cd-key">X</div><span>封阻</span><div class="cd-bar-bg"><div class="cd-bar-fill" id="cd-x"></div></div></div>
+  <div class="cd-row"><div class="cd-key">C</div><span>干擾</span><div class="cd-bar-bg"><div class="cd-bar-fill" id="cd-c"></div></div></div>
 </div>
 
-<!-- Main Menu Overlay -->
+<!-- ── Main Menu ── -->
 <div id="overlay">
   <h1>🏀 3v3</h1>
   <h2>街頭籃球</h2>
-  <div style="display:flex;gap:8px;margin-bottom:24px;">
+  <div class="row-opts">
+    <span>目標分數：</span>
+    <button class="diff-btn active" data-goal="5">先得5分</button>
+    <button class="diff-btn" data-goal="8">先得8分</button>
+  </div>
+  <div class="row-opts">
+    <span>難度：</span>
     <button class="diff-btn active" data-diff2="easy">簡單</button>
     <button class="diff-btn" data-diff2="medium">中度</button>
     <button class="diff-btn" data-diff2="hard">困難</button>
@@ -205,963 +173,894 @@
 </div>
 
 <script>
-// ─── CONSTANTS ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
 const CW = 900, CH = 520;
 const HOOP_R = 18;
-// Court colours
-const C_FLOOR  = '#c8832a';
-const C_LINE   = '#fff';
-const C_PAINT  = 'rgba(200,50,50,0.25)';
-const C_PAINT2 = 'rgba(50,80,200,0.18)';
+const HOOP_L   = { x: 68,      y: CH/2 };
+const HOOP_R_P = { x: CW - 68, y: CH/2 };
 
-// Hoop positions (half-court each side)
-const HOOP_L = { x: 68,  y: CH/2 };
-const HOOP_R_POS = { x: CW-68, y: CH/2 };
-
-// ─── DIFFICULTY ──────────────────────────────────────────────────────────────
-const DIFF_CFG = {
-  easy:   { speed:1.8, shotAcc:0.52, passAcc:0.82, defRadius:90,  react:55, shootDist:160 },
-  medium: { speed:2.4, shotAcc:0.68, passAcc:0.90, defRadius:110, react:35, shootDist:190 },
-  hard:   { speed:3.1, shotAcc:0.84, passAcc:0.97, defRadius:140, react:18, shootDist:230 },
+const DIFF = {
+  easy:   { spd:1.9, shotAcc:0.50, defR:85,  react:0.9,  stealChance:0.18, shootDist:155 },
+  medium: { spd:2.5, shotAcc:0.66, defR:110, react:0.55, stealChance:0.28, shootDist:185 },
+  hard:   { spd:3.2, shotAcc:0.83, defR:140, react:0.28, stealChance:0.42, shootDist:225 },
 };
-let difficulty = 'easy';
-let diffCfg = DIFF_CFG[difficulty];
 
-// ─── CANVAS ──────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
 const canvas = document.getElementById('c');
 const ctx    = canvas.getContext('2d');
 
-// ─── GAME STATE ──────────────────────────────────────────────────────────────
-let gameRunning = false;
-let gameTime    = 180; // 3 minutes
-let shotClock   = 24;
-let shotClockTimer = 0;
-let playerScore = 0;
-let enemyScore  = 0;
-let lastTime    = 0;
-let animId      = null;
+let difficulty   = 'easy';
+let cfg          = DIFF[difficulty];
+let goalScore    = 5;
 
-// Ball possession
-// hasBall: { team:'player'|'enemy', idx:0..2 }
-let ballHolder  = null;
-let ballInAir   = false;
-let ball        = { x: CW/2, y: CH/2, vx:0, vy:0, vy3d:0, z:0, vz:0, targetHoop:null, power:0 };
-let ballFree    = true; // on ground, no one holds
+let gameRunning  = false;
+let pScore = 0, eScore = 0;
+let shotClock    = 24;
+let lastTime     = 0, animId = null;
 
-// Power bar
-let shootingPower = 0;
-let chargingShot  = false;
-let powerDir      = 1;
+// Ball
+let ball = { x:CW/2, y:CH/2, z:0, vx:0, vy:0, vz:0,
+             _passTarget:null, _flightLeft:0, _flight:0, targetHoop:null };
+let ballHolder = null;   // { team, idx }
+let ballInAir  = false;
+let ballFree   = false;
+
+// Shooting power
+let chargingShot = false, shootPow = 0, powDir = 1;
+
+// Cooldowns (seconds remaining)
+let cdZ = 0, cdX = 0, cdC = 0;
+// Contest active
+let contestActive = false;
 
 // Controls
 const keys = {};
-window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; handleKeyDown(e); });
-window.addEventListener('keyup',   e => { keys[e.key.toLowerCase()] = false; handleKeyUp(e); });
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true;  onKeyDown(e); });
+window.addEventListener('keyup',   e => { keys[e.key.toLowerCase()] = false; onKeyUp(e);   });
 
-// ─── PLAYERS ─────────────────────────────────────────────────────────────────
-function makePlayer(x, y, team, idx) {
-  return {
-    x, y, vx:0, vy:0,
-    team, idx,
-    radius: 16,
-    speed: team === 'player' ? 3.0 : diffCfg.speed,
-    hasBall: false,
-    color: team === 'player' ? '#27ae60' : '#e74c3c',
-    number: idx + 1,
-    stamina: 100,
-    aiTimer: 0,
-    aiState: 'idle', // idle, offense, defense, goToball
-  };
+// Players array: [p0,p1,p2, e0,e1,e2]
+let players = [];
+let ctrlIdx = 0;  // which player index (0-2) user controls
+
+// Enemy AI timer
+let eAiT = 0;
+// Teammate AI timers per player
+let tmAiT = [0, 0, 0];
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function mkPlayer(x, y, team, idx) {
+  return { x, y, team, idx, radius:16,
+           color: team==='player' ? '#27ae60' : '#e74c3c',
+           number: idx+1,
+           stealCd:0  // per-player steal cooldown (for enemy AI)
+         };
 }
-
-let players = []; // [p0,p1,p2, e0,e1,e2]
 
 function initPlayers() {
   players = [
-    // Player team (left side initially)
-    makePlayer(220, CH/2,       'player', 0),
-    makePlayer(200, CH/2 - 90, 'player', 1),
-    makePlayer(200, CH/2 + 90, 'player', 2),
-    // Enemy team (right side)
-    makePlayer(680, CH/2,       'enemy', 0),
-    makePlayer(700, CH/2 - 90, 'enemy', 1),
-    makePlayer(700, CH/2 + 90, 'enemy', 2),
+    mkPlayer(220, CH/2,      'player', 0),
+    mkPlayer(200, CH/2-90,   'player', 1),
+    mkPlayer(200, CH/2+90,   'player', 2),
+    mkPlayer(680, CH/2,      'enemy',  0),
+    mkPlayer(700, CH/2-90,   'enemy',  1),
+    mkPlayer(700, CH/2+90,   'enemy',  2),
   ];
-  // Player 0 starts with ball
-  ballHolder  = { team:'player', idx:0 };
-  ballFree    = false;
-  ball.x      = players[0].x;
-  ball.y      = players[0].y;
-  ball.z      = 0;
-  ballInAir   = false;
-  controlledIdx = 0;
+  ballHolder = { team:'player', idx:0 };
+  ballInAir = false; ballFree = false;
+  ball.x = players[0].x; ball.y = players[0].y; ball.z = 0;
+  ball._passTarget = null; ball.targetHoop = null; ball._flightLeft = 0;
+  ctrlIdx = 0;
 }
 
-let controlledIdx = 0; // which player unit user controls
+// ═══════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════
+const dist  = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
+const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
 
-// ─── DRAW COURT ──────────────────────────────────────────────────────────────
+function getP(ref) {
+  if (!ref) return null;
+  return players[ref.team==='player' ? ref.idx : ref.idx+3];
+}
+function atkHoop(team)  { return team==='player' ? HOOP_R_P : HOOP_L; }
+function defHoop(team)  { return team==='player' ? HOOP_L   : HOOP_R_P; }
+function is3pt(x, y, team) { return dist({x,y}, atkHoop(team)) > 195; }
+
+function shotAcc(d, team) {
+  const base = team==='player' ? 0.78 : cfg.shotAcc;
+  return clamp(base - Math.max(0,(d-100)/420), 0.10, 0.97);
+}
+
+function moveToward(p, t, spd) {
+  const dx=t.x-p.x, dy=t.y-p.y, d=Math.hypot(dx,dy);
+  if (d<1) return;
+  p.x = clamp(p.x+(dx/d)*spd, 20, CW-20);
+  p.y = clamp(p.y+(dy/d)*spd, 20, CH-20);
+}
+
+// ═══════════════════════════════════════════════════════
+// DRAW COURT
+// ═══════════════════════════════════════════════════════
 function drawCourt() {
-  // Floor
-  ctx.fillStyle = C_FLOOR;
-  ctx.fillRect(0, 0, CW, CH);
+  ctx.fillStyle = '#c8832a';
+  ctx.fillRect(0,0,CW,CH);
 
-  // Side lines
-  ctx.strokeStyle = C_LINE;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(8, 8, CW-16, CH-16);
+  ctx.strokeStyle='#fff'; ctx.lineWidth=3;
+  ctx.strokeRect(8,8,CW-16,CH-16);
 
-  // Centre line
-  ctx.beginPath();
-  ctx.moveTo(CW/2, 8);
-  ctx.lineTo(CW/2, CH-8);
-  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(CW/2,8); ctx.lineTo(CW/2,CH-8); ctx.stroke();
+  ctx.beginPath(); ctx.arc(CW/2,CH/2,55,0,Math.PI*2); ctx.stroke();
 
-  // Centre circle
-  ctx.beginPath();
-  ctx.arc(CW/2, CH/2, 55, 0, Math.PI*2);
-  ctx.stroke();
-
-  // Left paint (key)
-  ctx.fillStyle = C_PAINT;
-  ctx.fillRect(8, CH/2 - 80, 160, 160);
-  ctx.strokeStyle = C_LINE; ctx.lineWidth = 2;
-  ctx.strokeRect(8, CH/2 - 80, 160, 160);
-
-  // Left 3pt arc
-  ctx.beginPath();
-  ctx.arc(HOOP_L.x, HOOP_L.y, 195, -Math.PI*0.68, Math.PI*0.68);
-  ctx.moveTo(8, CH/2 - 130);
-  ctx.lineTo(8 + 55, CH/2 - 130);
-  ctx.moveTo(8, CH/2 + 130);
-  ctx.lineTo(8 + 55, CH/2 + 130);
-  ctx.strokeStyle = C_LINE; ctx.lineWidth = 2;
-  ctx.stroke();
+  // Left paint
+  ctx.fillStyle='rgba(200,50,50,0.22)';
+  ctx.fillRect(8,CH/2-80,160,160);
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2;
+  ctx.strokeRect(8,CH/2-80,160,160);
 
   // Right paint
-  ctx.fillStyle = C_PAINT2;
-  ctx.fillRect(CW-168, CH/2 - 80, 160, 160);
-  ctx.strokeStyle = C_LINE; ctx.lineWidth = 2;
-  ctx.strokeRect(CW-168, CH/2 - 80, 160, 160);
+  ctx.fillStyle='rgba(50,80,200,0.18)';
+  ctx.fillRect(CW-168,CH/2-80,160,160);
+  ctx.strokeRect(CW-168,CH/2-80,160,160);
 
-  // Right 3pt arc
+  // Left 3pt
   ctx.beginPath();
-  ctx.arc(HOOP_R_POS.x, HOOP_R_POS.y, 195, Math.PI*0.32, Math.PI*1.68);
-  ctx.moveTo(CW-8, CH/2 - 130);
-  ctx.lineTo(CW-8-55, CH/2 - 130);
-  ctx.moveTo(CW-8, CH/2 + 130);
-  ctx.lineTo(CW-8-55, CH/2 + 130);
+  ctx.arc(HOOP_L.x, HOOP_L.y, 195, -Math.PI*0.68, Math.PI*0.68);
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+
+  // Right 3pt
+  ctx.beginPath();
+  ctx.arc(HOOP_R_P.x, HOOP_R_P.y, 195, Math.PI*0.32, Math.PI*1.68);
   ctx.stroke();
 
-  // Draw hoops
   drawHoop(HOOP_L);
-  drawHoop(HOOP_R_POS);
+  drawHoop(HOOP_R_P);
 }
 
 function drawHoop(h) {
-  // backboard
-  ctx.fillStyle = '#ddd';
-  const bx = h.x === HOOP_L.x ? h.x - 12 : h.x + 12;
-  ctx.fillRect(bx - (h.x === HOOP_L.x ? 4 : 0), h.y - 24, 4, 48);
+  const left = h.x < CW/2;
+  ctx.fillStyle='#ddd';
+  ctx.fillRect(left ? h.x-16 : h.x+12, h.y-26, 4, 52);
 
-  // rim
-  ctx.beginPath();
-  ctx.arc(h.x, h.y, HOOP_R, 0, Math.PI*2);
-  ctx.strokeStyle = '#e44';
-  ctx.lineWidth = 3;
-  ctx.stroke();
+  ctx.beginPath(); ctx.arc(h.x,h.y,HOOP_R,0,Math.PI*2);
+  ctx.strokeStyle='#e44'; ctx.lineWidth=3; ctx.stroke();
 
-  // net lines
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 1;
-  for (let a = 0; a < 8; a++) {
-    const ang = (a / 8) * Math.PI * 2;
+  ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1;
+  for (let a=0;a<8;a++) {
+    const ag=a/8*Math.PI*2;
     ctx.beginPath();
-    ctx.moveTo(h.x + Math.cos(ang)*HOOP_R, h.y + Math.sin(ang)*HOOP_R);
-    ctx.lineTo(h.x + Math.cos(ang)*8, h.y + Math.sin(ang)*8 + 18);
+    ctx.moveTo(h.x+Math.cos(ag)*HOOP_R, h.y+Math.sin(ag)*HOOP_R);
+    ctx.lineTo(h.x+Math.cos(ag)*7,       h.y+Math.sin(ag)*7+18);
     ctx.stroke();
   }
 }
 
-// ─── DRAW PLAYERS ────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// DRAW PLAYERS
+// ═══════════════════════════════════════════════════════
 function drawPlayers() {
-  for (let i = 0; i < players.length; i++) {
+  for (let i=0;i<players.length;i++) {
     const p = players[i];
-    const isControlled = (p.team === 'player' && i === controlledIdx);
-    const hasBall = ballHolder && ballHolder.team === p.team && ballHolder.idx === p.idx;
+    const isCtrl = (p.team==='player' && i===ctrlIdx);
+    const hasBall= ballHolder && ballHolder.team===p.team && ballHolder.idx===p.idx;
 
     // Shadow
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y + p.radius - 2, p.radius, 6, 0, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fill();
+    ctx.ellipse(p.x, p.y+p.radius-2, p.radius, 6, 0, 0, Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.28)'; ctx.fill();
 
     // Body
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2);
-    ctx.fillStyle = p.color;
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
+    ctx.fillStyle = p.color; ctx.fill();
 
-    // Controlled highlight
-    if (isControlled) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.radius + 4, 0, Math.PI*2);
-      ctx.strokeStyle = '#ffe040';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
+    // Controlled ring
+    if (isCtrl) {
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+4,0,Math.PI*2);
+      ctx.strokeStyle='#ffe040'; ctx.lineWidth=2.5; ctx.stroke();
     }
 
-    // Jersey number
-    ctx.fillStyle = '#fff';
-    ctx.font = `bold ${p.radius}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    // Number
+    ctx.fillStyle='#fff'; ctx.font=`bold ${p.radius}px Arial`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
     ctx.fillText(p.number, p.x, p.y);
 
-    // Ball indicator above head
+    // Ball dot above head
     if (hasBall && !ballInAir) {
-      ctx.fillStyle = '#f4a020';
-      ctx.beginPath();
-      ctx.arc(p.x, p.y - p.radius - 8, 6, 0, Math.PI*2);
-      ctx.fill();
+      ctx.fillStyle='#f4a020';
+      ctx.beginPath(); ctx.arc(p.x, p.y-p.radius-8, 6, 0, Math.PI*2); ctx.fill();
+    }
+
+    // Contest glow
+    if (contestActive && isCtrl) {
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+12,0,Math.PI*2);
+      ctx.strokeStyle='rgba(0,200,255,0.5)'; ctx.lineWidth=2; ctx.stroke();
     }
   }
 }
 
-// ─── DRAW BALL ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// DRAW BALL
+// ═══════════════════════════════════════════════════════
 function drawBall() {
-  if (!ballInAir && !ballFree && ballHolder) return; // drawn as dot above holder
-  const bz = ball.z;
-  const scale = 1 + bz * 0.018;
-  const r = 9 * scale;
-  // shadow
+  if (!ballInAir && !ballFree && ballHolder) return;
+  const bz=ball.z, scale=1+bz*0.018, r=9*scale;
   ctx.beginPath();
-  ctx.ellipse(ball.x, ball.y + 10, r * 1.2, r * 0.4, 0, 0, Math.PI*2);
-  ctx.fillStyle = `rgba(0,0,0,${0.35 - bz*0.008})`;
-  ctx.fill();
-  // ball
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y - bz * 0.5, r, 0, Math.PI*2);
-  const grad = ctx.createRadialGradient(ball.x - r*0.3, ball.y - bz*0.5 - r*0.3, r*0.1, ball.x, ball.y - bz*0.5, r);
-  grad.addColorStop(0, '#f9c74f');
-  grad.addColorStop(0.6, '#f4a020');
-  grad.addColorStop(1, '#c07010');
-  ctx.fillStyle = grad;
-  ctx.fill();
-  // seams
-  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y - bz*0.5, r, -0.4, Math.PI + 0.4);
-  ctx.stroke();
+  ctx.ellipse(ball.x, ball.y+10, r*1.2, r*0.4, 0, 0, Math.PI*2);
+  ctx.fillStyle=`rgba(0,0,0,${0.35-bz*0.007})`; ctx.fill();
+
+  ctx.beginPath(); ctx.arc(ball.x, ball.y-bz*0.5, r, 0, Math.PI*2);
+  const g=ctx.createRadialGradient(ball.x-r*0.3,ball.y-bz*0.5-r*0.3,r*0.1,ball.x,ball.y-bz*0.5,r);
+  g.addColorStop(0,'#f9c74f'); g.addColorStop(0.6,'#f4a020'); g.addColorStop(1,'#c07010');
+  ctx.fillStyle=g; ctx.fill();
+
+  ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.arc(ball.x,ball.y-bz*0.5,r,-0.4,Math.PI+0.4); ctx.stroke();
 }
 
-// ─── DRAW ARROW (pass target) ─────────────────────────────────────────────
-let passTargetIdx = -1;
+// ═══════════════════════════════════════════════════════
+// DRAW PASS ARROW
+// ═══════════════════════════════════════════════════════
 function drawPassArrow() {
-  if (!ballHolder || ballHolder.team !== 'player') return;
-  const holder = getPlayerObj(ballHolder);
-  if (!holder) return;
-  // find nearest teammate
-  let best = -1, bestD = 9999;
-  for (let i = 0; i < 3; i++) {
-    if (i === controlledIdx) continue;
-    const p = players[i];
-    const d = dist(holder, p);
-    if (d < bestD) { bestD = d; best = i; }
+  if (!ballHolder || ballHolder.team!=='player') return;
+  const h = getP(ballHolder); if (!h) return;
+  let best=-1, bestD=9999;
+  for (let i=0;i<3;i++) {
+    if (i===ctrlIdx) continue;
+    const d=dist(h,players[i]);
+    if (d<bestD) { bestD=d; best=i; }
   }
-  passTargetIdx = best;
-  if (best < 0) return;
-  const tp = players[best];
-  ctx.save();
-  ctx.setLineDash([6, 4]);
-  ctx.strokeStyle = 'rgba(255,255,100,0.6)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(holder.x, holder.y);
-  ctx.lineTo(tp.x, tp.y);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
+  if (best<0) return;
+  const tp=players[best];
+  ctx.save(); ctx.setLineDash([6,4]);
+  ctx.strokeStyle='rgba(255,255,80,0.55)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(h.x,h.y); ctx.lineTo(tp.x,tp.y); ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
 }
 
-// ─── DRAW SHOOT INDICATOR ────────────────────────────────────────────────────
-function drawShootIndicator() {
-  if (!chargingShot) return;
-  const holder = getPlayerObj(ballHolder);
-  if (!holder) return;
-  const hoop = getAttackHoop('player');
-  const d = dist(holder, hoop);
-  // arc showing range
-  const accuracy = calcShotAccuracy(d, 'player');
-  ctx.beginPath();
-  ctx.arc(holder.x, holder.y, d, 0, Math.PI*2);
-  ctx.strokeStyle = `rgba(255,200,0,${0.15 + accuracy*0.2})`;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-}
+// ═══════════════════════════════════════════════════════
+// SHOOTING
+// ═══════════════════════════════════════════════════════
+function shootBall(ref, pow, extraMiss=0) {
+  const sh   = getP(ref);
+  const hoop = atkHoop(ref.team);
+  const d    = dist(sh, hoop);
+  const acc  = shotAcc(d, ref.team) - extraMiss;
+  const powErr = Math.abs(pow/100 - 0.65) * 0.55;
+  const made = Math.random() < clamp(acc - powErr, 0.04, 0.97);
 
-// ─── POWER BAR ───────────────────────────────────────────────────────────────
-const pwWrap = document.getElementById('power-bar-wrap');
-const pwBar  = document.getElementById('power-bar');
+  ballHolder=null; ballFree=false; ballInAir=true;
+  ball.x=sh.x; ball.y=sh.y; ball.z=0;
 
-function updatePowerBarUI() {
-  if (chargingShot) {
-    pwWrap.style.display = 'flex';
-    pwBar.style.width = shootingPower + '%';
+  if (made) {
+    ball.targetHoop = { x:hoop.x, y:hoop.y, made:true, shooter:{...ref} };
   } else {
-    pwWrap.style.display = 'none';
-  }
-}
-
-// ─── UI HELPERS ──────────────────────────────────────────────────────────────
-function updateScoreUI() {
-  document.getElementById('score-player').textContent = playerScore;
-  document.getElementById('score-enemy').textContent  = enemyScore;
-}
-
-function updateTimerUI() {
-  const m = Math.floor(gameTime / 60);
-  const s = Math.floor(gameTime % 60).toString().padStart(2,'0');
-  document.getElementById('timer').textContent = `${m}:${s}`;
-  document.getElementById('shot-num').textContent = Math.ceil(shotClock);
-}
-
-let msgTimeout = null;
-function showMsg(text, color='#f4a020') {
-  const el = document.getElementById('message-box');
-  el.textContent = text;
-  el.style.color = color;
-  el.style.borderColor = color;
-  el.style.opacity = '1';
-  clearTimeout(msgTimeout);
-  msgTimeout = setTimeout(() => { el.style.opacity = '0'; }, 1800);
-}
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
-function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-
-function getPlayerObj(ref) {
-  if (!ref) return null;
-  const offset = ref.team === 'player' ? 0 : 3;
-  return players[offset + ref.idx];
-}
-
-function getAttackHoop(team) {
-  // player attacks right hoop, enemy attacks left
-  return team === 'player' ? HOOP_R_POS : HOOP_L;
-}
-
-function getDefendHoop(team) {
-  return team === 'player' ? HOOP_L : HOOP_R_POS;
-}
-
-function is3Pointer(shooterX, shooterY, team) {
-  const hoop = getAttackHoop(team);
-  return dist({x:shooterX, y:shooterY}, hoop) > 195;
-}
-
-// ─── SHOT ACCURACY ───────────────────────────────────────────────────────────
-function calcShotAccuracy(d, team) {
-  const base = team === 'player' ? 0.78 : diffCfg.shotAcc;
-  // distance penalty
-  const penalty = Math.max(0, (d - 100) / 400);
-  return clamp(base - penalty, 0.1, 0.98);
-}
-
-// ─── SHOOTING ────────────────────────────────────────────────────────────────
-function shootBall(shooterRef, powerPct) {
-  const shooter = getPlayerObj(shooterRef);
-  const hoop    = getAttackHoop(shooterRef.team);
-  const d       = dist(shooter, hoop);
-  const acc     = calcShotAccuracy(d, shooterRef.team);
-  const three   = is3Pointer(shooter.x, shooter.y, shooterRef.team);
-
-  ballHolder = null;
-  ballFree   = false;
-  ballInAir  = true;
-  ball.x     = shooter.x;
-  ball.y     = shooter.y;
-
-  // Optimal power ~60-70%
-  const optPow = 0.65;
-  const powErr  = Math.abs(powerPct/100 - optPow) * 0.6;
-  const hitRoll = Math.random() < (acc - powErr);
-
-  if (hitRoll) {
-    // Shoot to hoop
-    ball.targetHoop = { x: hoop.x, y: hoop.y, made: true, three, shooter: {...shooterRef} };
-  } else {
-    // Miss — offset
-    const ang  = Math.atan2(hoop.y - shooter.y, hoop.x - shooter.x);
-    const off  = (Math.random() - 0.5) * 80;
+    const ang = Math.atan2(hoop.y-sh.y, hoop.x-sh.x);
+    const off = (Math.random()-0.5)*90;
     ball.targetHoop = {
-      x: hoop.x + Math.cos(ang + Math.PI/2)*off,
-      y: hoop.y + Math.sin(ang + Math.PI/2)*off + (Math.random()-0.5)*40,
-      made: false, three, shooter: {...shooterRef}
+      x: hoop.x + Math.cos(ang+Math.PI/2)*off,
+      y: hoop.y + Math.sin(ang+Math.PI/2)*off + (Math.random()-0.5)*40,
+      made:false, shooter:{...ref}
     };
   }
-
-  // Calc velocity for arc
-  const dx = ball.targetHoop.x - ball.x;
-  const dy = ball.targetHoop.y - ball.y;
-  const tFlight = 38; // frames
-  ball.vx = dx / tFlight;
-  ball.vy = dy / tFlight;
-  ball.vz = 14;
-  ball.z  = 0;
-  ball._flight = tFlight;
-  ball._flightLeft = tFlight;
+  const dx=ball.targetHoop.x-ball.x, dy=ball.targetHoop.y-ball.y;
+  const tf=38;
+  ball.vx=dx/tf; ball.vy=dy/tf; ball.vz=14;
+  ball._flight=tf; ball._flightLeft=tf;
+  ball._passTarget=null;
+  chargingShot=false; shootPow=0;
 }
 
-function passBall(fromRef, toIdx) {
-  const from = getPlayerObj(fromRef);
-  const to   = players[toIdx];
-  if (!to) return;
-
-  ballHolder = null;
-  ballFree   = false;
-  ballInAir  = false; // pass is ground-level for now
-  // Actually let's do a quick aerial pass
-  ball.x  = from.x;
-  ball.y  = from.y;
-  ball.z  = 0;
-
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const d  = Math.hypot(dx, dy);
-  const speed = 9;
-  ball.vx = dx / d * speed;
-  ball.vy = dy / d * speed;
-  ball.vz = 3;
-  ball._passTarget = { team: fromRef.team, idx: toIdx % 3 };
-  ball._passDist   = d;
-  ball._passTravelled = 0;
-  ballInAir = true;
-  ball._flight = -1; // pass mode
-  ball._flightLeft = -1;
-  ball.targetHoop = null;
+function passBall(fromRef, toGlobalIdx) {
+  const from=getP(fromRef), to=players[toGlobalIdx];
+  if (!from||!to) return;
+  ballHolder=null; ballFree=false; ballInAir=true;
+  ball.x=from.x; ball.y=from.y; ball.z=0;
+  const dx=to.x-from.x, dy=to.y-from.y, d=Math.hypot(dx,dy);
+  const spd=9;
+  ball.vx=dx/d*spd; ball.vy=dy/d*spd; ball.vz=3;
+  ball._passTarget = { team:fromRef.team, idx:toGlobalIdx%3 };
+  ball._flightLeft=-1; ball._flight=-1; ball.targetHoop=null;
 }
 
-// ─── BALL PHYSICS ─────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// BALL PHYSICS
+// ═══════════════════════════════════════════════════════
 function updateBall(dt) {
   if (!ballInAir) {
     if (!ballFree && ballHolder) {
-      const h = getPlayerObj(ballHolder);
-      if (h) { ball.x = h.x; ball.y = h.y; }
+      const h=getP(ballHolder);
+      if (h) { ball.x=h.x; ball.y=h.y; }
     }
     return;
   }
 
-  // Pass mode
+  // Pass flight
   if (ball._passTarget) {
-    const d = Math.hypot(ball.vx, ball.vy);
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-    ball.z = Math.max(0, ball.z + ball.vz);
-    ball.vz -= 0.4;
-    ball._passTravelled += d;
-
-    // Check catch
-    const target = players[ball._passTarget.team === 'player' ? ball._passTarget.idx : ball._passTarget.idx + 3];
-    if (target && dist(ball, target) < 32) {
-      catchBall(ball._passTarget);
-      ball._passTarget = null;
+    ball.x+=ball.vx; ball.y+=ball.vy;
+    ball.z=Math.max(0, ball.z+ball.vz); ball.vz-=0.4;
+    const tIdx = ball._passTarget.team==='player' ? ball._passTarget.idx : ball._passTarget.idx+3;
+    const tgt  = players[tIdx];
+    if (tgt && dist(ball,tgt)<34) {
+      catchBall(ball._passTarget); ball._passTarget=null; return;
     }
-    // Loose ball check
-    if (ball.z <= 0 && !ball._passTarget) { ball.z = 0; }
-    if (ball.z < 0) {
-      ball.z = 0;
-      if (ball._passTarget) {
-        // dropped — free ball
-        dropBall();
+    // Intercept by enemy
+    for (let i=3;i<6;i++) {
+      const ep=players[i];
+      if (dist(ball,ep)<ep.radius+10 && ball._passTarget.team==='player') {
+        catchBall({team:'enemy',idx:i-3});
+        ball._passTarget=null;
+        showMsg('傳球被截！','#e44');
+        return;
       }
     }
+    if (ball.z<0) { ball.z=0; dropBall(); }
     return;
   }
 
   // Shot arc
-  if (ball._flightLeft > 0) {
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-    ball.z += ball.vz;
-    ball.vz -= 28 / ball._flight; // gravity
+  if (ball._flightLeft>0) {
+    ball.x+=ball.vx; ball.y+=ball.vy;
+    ball.z+=ball.vz; ball.vz-=28/ball._flight;
     ball._flightLeft--;
 
-    if (ball._flightLeft <= 0) {
-      // Arrived
-      ball.x = ball.targetHoop.x;
-      ball.y = ball.targetHoop.y;
-      ball.z = 0;
-      ballInAir = false;
-
+    if (ball._flightLeft<=0) {
+      ball.x=ball.targetHoop.x; ball.y=ball.targetHoop.y; ball.z=0;
+      ballInAir=false;
       if (ball.targetHoop.made) {
-        // Score!
-        const pts = ball.targetHoop.three ? 3 : 2;
-        if (ball.targetHoop.shooter.team === 'player') {
-          playerScore += pts;
-          showMsg(pts === 3 ? '🔥 三分球！+3' : '✅ 得分！+2', '#f4a020');
-          resetAfterScore('player');
-        } else {
-          enemyScore += pts;
-          showMsg(pts === 3 ? '對手三分！' : '對手得分！', '#e44');
-          resetAfterScore('enemy');
-        }
+        const team=ball.targetHoop.shooter.team;
+        if (team==='player') { pScore++; showMsg('✅ 得分！','#f4a020'); }
+        else                 { eScore++; showMsg('對手得分！','#e44'); }
         updateScoreUI();
+        if (pScore>=goalScore || eScore>=goalScore) { endGame(); return; }
+        resetAfterScore(team);
       } else {
-        // Rebound
-        ballFree = true;
-        ballHolder = null;
-        ball.vx = (Math.random()-0.5)*3;
-        ball.vy = (Math.random()-0.5)*3;
-        showMsg('籃板！', '#adf');
+        ballFree=true; ballHolder=null;
+        ball.vx=(Math.random()-0.5)*3.5; ball.vy=(Math.random()-0.5)*3.5;
+        showMsg('籃板！','#8cf');
       }
-      return;
     }
+    return;
   }
 
-  // Bounce if free
+  // Free ball bounce
   if (ballFree) {
-    ball.x += ball.vx;
-    ball.y += ball.vy;
-    ball.vx *= 0.96;
-    ball.vy *= 0.96;
-    if (ball.x < 20)  { ball.x = 20;  ball.vx *= -0.6; }
-    if (ball.x > CW-20){ ball.x = CW-20; ball.vx *= -0.6; }
-    if (ball.y < 20)  { ball.y = 20;  ball.vy *= -0.6; }
-    if (ball.y > CH-20){ ball.y = CH-20; ball.vy *= -0.6; }
+    ball.x+=ball.vx; ball.y+=ball.vy;
+    ball.vx*=0.96; ball.vy*=0.96;
+    if (ball.x<20)   { ball.x=20;    ball.vx*=-0.6; }
+    if (ball.x>CW-20){ ball.x=CW-20; ball.vx*=-0.6; }
+    if (ball.y<20)   { ball.y=20;    ball.vy*=-0.6; }
+    if (ball.y>CH-20){ ball.y=CH-20; ball.vy*=-0.6; }
   }
 }
 
 function catchBall(ref) {
-  ballHolder  = { team: ref.team, idx: ref.idx };
-  ballInAir   = false;
-  ballFree    = false;
-  ball._passTarget = null;
-  ball.z = 0;
-  shotClock = 24;
-  if (ref.team === 'player') controlledIdx = ref.idx;
+  ballHolder={team:ref.team, idx:ref.idx};
+  ballInAir=false; ballFree=false;
+  ball._passTarget=null; ball.z=0;
+  ball.vx=0; ball.vy=0;
+  shotClock=24;
+  if (ref.team==='player') ctrlIdx=ref.idx;
 }
 
 function dropBall() {
-  ball._passTarget = null;
-  ballFree   = true;
-  ballHolder = null;
-  ballInAir  = true;
-  ball.vx = (Math.random()-0.5)*4;
-  ball.vy = (Math.random()-0.5)*4;
-  ball.vz = 2;
-  ball.z  = 0;
+  ball._passTarget=null;
+  ballFree=true; ballHolder=null; ballInAir=true;
+  ball.vx=(Math.random()-0.5)*4; ball.vy=(Math.random()-0.5)*4;
+  ball.vz=1; ball.z=0;
 }
 
-// ─── PICKUP (free ball) ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// PICKUP
+// ═══════════════════════════════════════════════════════
 function checkPickup() {
   if (!ballFree) return;
-  for (let i = 0; i < players.length; i++) {
-    const p = players[i];
-    if (dist(p, ball) < p.radius + 12) {
-      ballHolder  = { team: p.team, idx: p.idx };
-      ballFree    = false;
-      ballInAir   = false;
-      ball.vx = 0; ball.vy = 0;
-      if (p.team === 'player') {
-        controlledIdx = p.idx;
-        showMsg('搶到球！');
-      }
-      shotClock = 24;
-      return;
+  for (let i=0;i<players.length;i++) {
+    const p=players[i];
+    if (dist(p,ball)<p.radius+14) {
+      ballHolder={team:p.team, idx:p.idx};
+      ballFree=false; ballInAir=false;
+      ball.vx=0; ball.vy=0;
+      if (p.team==='player') { ctrlIdx=p.idx; showMsg('搶到球！'); }
+      shotClock=24; return;
     }
   }
 }
 
-// ─── PLAYER MOVEMENT ─────────────────────────────────────────────────────────
-function updatePlayerMovement(dt) {
-  const p = players[controlledIdx];
-  let dx = 0, dy = 0;
-  if (keys['w'] || keys['arrowup'])    dy -= 1;
-  if (keys['s'] || keys['arrowdown'])  dy += 1;
-  if (keys['a'] || keys['arrowleft'])  dx -= 1;
-  if (keys['d'] || keys['arrowright']) dx += 1;
-  if (dx !== 0 || dy !== 0) {
-    const len = Math.hypot(dx, dy);
-    p.x += (dx/len) * p.speed;
-    p.y += (dy/len) * p.speed;
+// ═══════════════════════════════════════════════════════
+// PLAYER MOVEMENT (user-controlled)
+// ═══════════════════════════════════════════════════════
+function updatePlayerMovement() {
+  const p=players[ctrlIdx];
+  let dx=0,dy=0;
+  if (keys['w']||keys['arrowup'])    dy-=1;
+  if (keys['s']||keys['arrowdown'])  dy+=1;
+  if (keys['a']||keys['arrowleft'])  dx-=1;
+  if (keys['d']||keys['arrowright']) dx+=1;
+  if (dx||dy) {
+    const len=Math.hypot(dx,dy);
+    p.x=clamp(p.x+(dx/len)*3.0, 20, CW-20);
+    p.y=clamp(p.y+(dy/len)*3.0, 20, CH-20);
   }
-  p.x = clamp(p.x, 20, CW-20);
-  p.y = clamp(p.y, 20, CH-20);
 }
 
-// ─── TEAMMATE AI ──────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// TEAMMATE AI (full AI when not controlled)
+// ═══════════════════════════════════════════════════════
 function updateTeammateAI(dt) {
-  for (let i = 0; i < 3; i++) {
-    if (i === controlledIdx) continue;
+  for (let i=0;i<3;i++) {
+    if (i===ctrlIdx) continue;
     const p = players[i];
-    p.aiTimer -= dt;
+    tmAiT[i] -= dt;
 
-    const hasBall2 = ballHolder && ballHolder.team === 'player' && ballHolder.idx === i;
-    if (hasBall2) {
-      // Move toward hoop slowly
-      const hoop = getAttackHoop('player');
-      moveToward(p, hoop, 1.8);
-      return;
-    }
+    const iHaveBall = ballHolder && ballHolder.team==='player' && ballHolder.idx===i;
+    const teamHasBall = ballHolder && ballHolder.team==='player';
+    const enemyHasBall = ballHolder && ballHolder.team==='enemy';
 
-    // Spread on court
-    const targets = [
-      { x: 350, y: CH/2 - 120 },
-      { x: 350, y: CH/2 + 120 },
-      { x: 500, y: CH/2 },
-    ];
-    const t = targets[i];
-    if (dist(p, t) > 20) moveToward(p, t, 1.8);
-  }
-}
-
-function moveToward(p, target, spd) {
-  const dx = target.x - p.x;
-  const dy = target.y - p.y;
-  const d  = Math.hypot(dx, dy);
-  if (d < 2) return;
-  p.x += (dx/d) * spd;
-  p.y += (dy/d) * spd;
-  p.x = clamp(p.x, 20, CW-20);
-  p.y = clamp(p.y, 20, CH-20);
-}
-
-// ─── ENEMY AI ─────────────────────────────────────────────────────────────────
-let enemyAiTimer = 0;
-
-function updateEnemyAI(dt) {
-  enemyAiTimer -= dt;
-  const spd = diffCfg.speed;
-
-  // Find enemy with ball
-  let ballCarrierIdx = -1;
-  if (ballHolder && ballHolder.team === 'enemy') ballCarrierIdx = ballHolder.idx;
-
-  for (let i = 0; i < 3; i++) {
-    const p = players[3 + i];
-    const isCarrier = (i === ballCarrierIdx);
-
-    if (isCarrier) {
-      // Carrier: move toward player hoop, try to shoot
-      const hoop = getAttackHoop('enemy');
+    if (iHaveBall) {
+      // I have ball: move toward hoop, shoot if in range, pass if pressured
+      const hoop = atkHoop('player');
       const d    = dist(p, hoop);
-      if (d < diffCfg.shootDist && enemyAiTimer <= 0) {
-        // Try shot
-        shootBall({ team:'enemy', idx:i }, 65);
-        enemyAiTimer = diffCfg.react / 10;
+      const nearEnemy = closestTo(p,'enemy');
+      const pressure  = nearEnemy && dist(p,nearEnemy) < 55;
+
+      if (pressure && tmAiT[i]<=0) {
+        // Pass to teammate further from pressure
+        const mate = bestPassFor('player', i);
+        if (mate>=0) { passBall({team:'player',idx:i}, mate); tmAiT[i]=0.8; return; }
+      }
+      if (d < 170 && tmAiT[i]<=0) {
+        shootBall({team:'player',idx:i}, 65);
+        tmAiT[i] = 1.2;
         return;
       }
-      // Try to pass if player is close
-      const closestPlayer = closestPlayerTo(p, 'player');
-      if (closestPlayer && dist(p, closestPlayer) < diffCfg.defRadius && Math.random() < 0.02) {
-        // pass to teammate
-        const mate = bestPassTarget('enemy', i);
-        if (mate >= 0) {
-          passBall({ team:'enemy', idx:i }, 3 + mate);
-          return;
+      moveToward(p, hoop, 2.0);
+
+    } else if (teamHasBall) {
+      // Teammate has ball: cut toward open spots around the paint
+      const offPos = [
+        { x:600, y:CH/2-130 },
+        { x:620, y:CH/2+130 },
+        { x:680, y:CH/2 },
+      ];
+      const t = offPos[i % offPos.length];
+      moveToward(p, t, 2.0);
+
+    } else if (enemyHasBall) {
+      // Defense: mark nearest enemy player
+      const marks = [3, 4, 5];
+      const markP = players[marks[i]];
+      if (markP) {
+        const tgt = { x: markP.x + (p.x>markP.x ? 28:-28), y: markP.y };
+        moveToward(p, tgt, 2.2);
+        // Teammate steal attempt
+        if (dist(p, markP) < 32 && tmAiT[i]<=0 && ballHolder && ballHolder.team==='enemy' && ballHolder.idx===marks[i]-3) {
+          if (Math.random() < 0.15) {
+            dropBall();
+            showMsg('隊友抄球！','#4ef');
+          }
+          tmAiT[i]=1.5;
         }
       }
-      moveToward(p, hoop, spd);
-    } else if (ballCarrierIdx >= 0) {
-      // Support run — spread to open positions
-      const support = [
-        { x: 650, y: CH/2 - 110 },
-        { x: 720, y: CH/2 + 110 },
-        { x: 600, y: CH/2 },
-      ];
-      moveToward(p, support[i], spd * 0.8);
+
     } else {
-      // Defense / go to ball
+      // Ball free: go chase it
+      if (ballFree) moveToward(p, ball, 2.2);
+      else {
+        // Return to default spread
+        const def = [{x:300,y:CH/2},{x:260,y:CH/2-100},{x:260,y:CH/2+100}];
+        moveToward(p, def[i], 1.8);
+      }
+    }
+  }
+}
+
+function closestTo(p, team) {
+  let best=null, bestD=9999;
+  const off=team==='player'?0:3;
+  for (let i=0;i<3;i++) {
+    const d=dist(p,players[off+i]);
+    if (d<bestD){bestD=d;best=players[off+i];}
+  }
+  return best;
+}
+
+function bestPassFor(team, selfIdx) {
+  let best=-1, bestS=-1;
+  const off = team==='player' ? 0 : 3;
+  for (let i=0;i<3;i++) {
+    if (i===selfIdx) continue;
+    const p    = players[off+i];
+    const hoop = atkHoop(team);
+    const s    = 1000 - dist(p, hoop);
+    if (s>bestS) { bestS=s; best=off+i; }
+  }
+  return best;
+}
+
+// ═══════════════════════════════════════════════════════
+// ENEMY AI
+// ═══════════════════════════════════════════════════════
+function updateEnemyAI(dt) {
+  eAiT -= dt;
+  const spd = cfg.spd;
+  let carrier = (ballHolder && ballHolder.team==='enemy') ? ballHolder.idx : -1;
+
+  for (let i=0;i<3;i++) {
+    const p = players[3+i];
+    p.stealCd = Math.max(0, (p.stealCd||0)-dt);
+
+    if (i===carrier) {
+      // Has ball: drive to hoop or pass
+      const hoop = atkHoop('enemy');
+      const d    = dist(p, hoop);
+      const near = closestTo(p,'player');
+      const pressured = near && dist(p,near)<cfg.defR*0.6;
+
+      if (pressured && eAiT<=0 && Math.random()<0.04) {
+        const mate=bestPassFor('enemy',i);
+        if (mate>=0){ passBall({team:'enemy',idx:i}, mate); return; }
+      }
+      if (d<cfg.shootDist && eAiT<=0) {
+        shootBall({team:'enemy',idx:i}, 65);
+        eAiT=cfg.react;
+        return;
+      }
+      moveToward(p, hoop, spd);
+
+    } else if (carrier>=0) {
+      // Support: spread to open spots
+      const spots=[{x:660,y:CH/2-120},{x:730,y:CH/2+120},{x:610,y:CH/2}];
+      moveToward(p, spots[i], spd*0.85);
+
+    } else {
+      // Defense / chase
       if (ballFree) {
         moveToward(p, ball, spd);
-      } else if (ballHolder && ballHolder.team === 'player') {
-        // Defend: go to mark a player or ball
-        const mark = players[i]; // mark same-index player
-        const target = i === 0
-          ? getPlayerObj(ballHolder)
-          : players[i];
-        if (mark && dist(p, target) > 30) {
-          moveToward(p, {
-            x: target.x + (p.x > target.x ? 30 : -30),
-            y: target.y
-          }, spd);
-        }
-        // Steal attempt
-        if (ballHolder.team === 'player' && enemyAiTimer <= 0) {
-          const holderP = getPlayerObj(ballHolder);
-          if (holderP && dist(p, holderP) < 28) {
-            const stealChance = diffCfg.shotAcc * 0.25;
-            if (Math.random() < stealChance) {
-              // Steal!
+      } else if (ballHolder && ballHolder.team==='player') {
+        const mark = players[i];  // mark same-index player
+        const bh   = getP(ballHolder);
+        const tgt  = i===0 ? bh : mark;
+        if (tgt) {
+          moveToward(p, { x:tgt.x+(p.x>tgt.x?32:-32), y:tgt.y }, spd);
+          // Steal attempt
+          if (bh && dist(p,bh)<30 && p.stealCd<=0) {
+            if (Math.random()<cfg.stealChance*dt*2.5) {
               dropBall();
-              ballFree = true;
-              showMsg('被搶球了！', '#e44');
-              enemyAiTimer = 1.0;
+              showMsg('被搶球！','#e44');
+              p.stealCd=1.8;
             }
           }
         }
       }
     }
   }
-
-  if (enemyAiTimer <= 0) enemyAiTimer = diffCfg.react / 1000;
+  if (eAiT<=0) eAiT=cfg.react;
 }
 
-function closestPlayerTo(p, team) {
-  let best = null, bestD = 9999;
-  const offset = team === 'player' ? 0 : 3;
-  for (let i = 0; i < 3; i++) {
-    const d = dist(p, players[offset + i]);
-    if (d < bestD) { bestD = d; best = players[offset + i]; }
+// ═══════════════════════════════════════════════════════
+// ZXC — STEAL / BLOCK / CONTEST
+// ═══════════════════════════════════════════════════════
+function doSteal() {
+  // Z: reach-in steal on ball handler
+  if (cdZ>0) return;
+  const me = players[ctrlIdx];
+  if (ballHolder && ballHolder.team==='enemy') {
+    const bh = getP(ballHolder);
+    if (bh && dist(me,bh)<40) {
+      const chance = 0.55 - (dist(me,bh)/40)*0.25;
+      if (Math.random()<chance) {
+        dropBall();
+        showMsg('🔥 搶斷成功！','#4ef');
+      } else {
+        showMsg('搶斷失敗','#888');
+      }
+      cdZ=1.6;
+    } else {
+      showMsg('距離太遠','#888');
+    }
+  } else if (ballFree) {
+    // rush toward ball
+    moveToward(me, ball, 8);
   }
-  return best;
+  cdZ=1.6;
 }
 
-function bestPassTarget(team, selfIdx) {
-  let best = -1, bestScore = -1;
-  for (let i = 0; i < 3; i++) {
-    if (i === selfIdx) continue;
-    const p = players[team === 'player' ? i : 3 + i];
-    const hoop = getAttackHoop(team);
-    const score = 1000 - dist(p, hoop);
-    if (score > bestScore) { bestScore = score; best = i; }
+function doBlock() {
+  // X: block shot in air
+  if (cdX>0) return;
+  const me = players[ctrlIdx];
+  if (ballInAir && ball.targetHoop && ball._flightLeft>0 && ball._flightLeft<ball._flight*0.7) {
+    const dBall = dist(me, ball);
+    if (dBall < 65) {
+      // Block! Turn made into miss
+      ball.targetHoop.made = false;
+      const ang = Math.atan2(me.y-ball.targetHoop.y, me.x-ball.targetHoop.x);
+      ball.targetHoop.x += Math.cos(ang)*100;
+      ball.targetHoop.y += Math.sin(ang)*60;
+      showMsg('🙌 封阻！','#4ef');
+    } else {
+      showMsg('太遠了','#888');
+    }
+  } else {
+    showMsg('沒有射球可封','#888');
   }
-  return best;
+  cdX=2.0;
 }
 
-// ─── STEAL / DEFENSE ─────────────────────────────────────────────────────────
-function handleKeyDown(e) {
+function doContest() {
+  // C: contest — reduce nearby enemy shot accuracy temporarily
+  if (cdC>0) return;
+  contestActive=true;
+  const me = players[ctrlIdx];
+  let hit=false;
+  // If enemy is charging a shot within range, reduce their accuracy flag
+  for (let i=0;i<3;i++) {
+    const ep=players[3+i];
+    if (dist(me,ep)<55) {
+      ep._contested=2.5;   // seconds of debuff
+      hit=true;
+    }
+  }
+  showMsg(hit ? '💪 干擾防守！':'沒有人在附近', hit?'#4ef':'#888');
+  cdC=2.2;
+  setTimeout(()=>{ contestActive=false; },500);
+}
+
+// ═══════════════════════════════════════════════════════
+// KEY HANDLERS
+// ═══════════════════════════════════════════════════════
+function onKeyDown(e) {
   if (!gameRunning) return;
   const k = e.key.toLowerCase();
+  e.preventDefault && ['j','z','x','c',' '].includes(k) && e.preventDefault();
 
   // Pass
-  if (k === ' ') {
-    e.preventDefault();
-    if (ballHolder && ballHolder.team === 'player' && ballHolder.idx === controlledIdx) {
-      // Find best teammate
-      const mate = bestPassTarget('player', controlledIdx);
-      if (mate >= 0) {
-        passBall(ballHolder, mate);
-        controlledIdx = mate;
-      }
+  if (k===' ') {
+    if (ballHolder && ballHolder.team==='player' && ballHolder.idx===ctrlIdx) {
+      const mate = bestPassFor('player', ctrlIdx);
+      if (mate>=0) { passBall(ballHolder, mate); }
     }
   }
 
-  // Shoot — start charging
-  if (k === 'j') {
-    if (ballHolder && ballHolder.team === 'player' && ballHolder.idx === controlledIdx) {
-      chargingShot = true;
-      shootingPower = 0;
-      powerDir = 1;
+  // Shoot charge
+  if (k==='j') {
+    if (ballHolder && ballHolder.team==='player' && ballHolder.idx===ctrlIdx) {
+      chargingShot=true; shootPow=0; powDir=1;
     }
   }
 
-  // Steal / switch
-  if (k === 'k') {
-    // Switch to nearest player without ball
-    if (!ballHolder || ballHolder.team !== 'player') {
-      // Try grab free ball
-      if (ballFree) {
-        // no-op, will pick up via proximity
-      }
-    } else if (ballHolder.team === 'player') {
-      // Try to dribble past — no-op for now
+  // Switch player
+  if (k==='k') {
+    let bestI=ctrlIdx, bestD=9999;
+    for (let i=0;i<3;i++) {
+      if (i===ctrlIdx) continue;
+      const p=players[i];
+      const ref=ballFree?ball:(getP(ballHolder)||ball);
+      const d=dist(p,ref);
+      if (d<bestD){ bestD=d; bestI=i; }
     }
-    // Switch controlled player
-    let bestI = controlledIdx, bestD2 = 9999;
-    for (let i = 0; i < 3; i++) {
-      if (i === controlledIdx) continue;
-      const p = players[i];
-      const holderP = getPlayerObj(ballHolder);
-      const target = ballFree ? ball : (holderP || ball);
-      const d = dist(p, target);
-      if (d < bestD2) { bestD2 = d; bestI = i; }
+    ctrlIdx=bestI;
+  }
+
+  // ZXC
+  if (k==='z') doSteal();
+  if (k==='x') doBlock();
+  if (k==='c') doContest();
+}
+
+function onKeyUp(e) {
+  const k=e.key.toLowerCase();
+  if (k==='j' && chargingShot) {
+    chargingShot=false;
+    if (ballHolder && ballHolder.team==='player' && ballHolder.idx===ctrlIdx) {
+      const me = players[ctrlIdx];
+      const extraMiss = me._contested ? 0.2 : 0;
+      shootBall(ballHolder, shootPow, extraMiss);
     }
-    controlledIdx = bestI;
+    shootPow=0;
+    document.getElementById('pw-wrap').style.display='none';
   }
 }
 
-function handleKeyUp(e) {
-  const k = e.key.toLowerCase();
-  if (k === 'j' && chargingShot) {
-    // Release shoot
-    chargingShot = false;
-    if (ballHolder && ballHolder.team === 'player' && ballHolder.idx === controlledIdx) {
-      shootBall(ballHolder, shootingPower);
-    }
-    shootingPower = 0;
-    pwWrap.style.display = 'none';
-  }
-}
-
-// ─── SHOT CLOCK ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// SHOT CLOCK
+// ═══════════════════════════════════════════════════════
 function updateShotClock(dt) {
   if (!ballHolder) return;
   shotClock -= dt;
-  if (shotClock <= 0) {
-    shotClock = 24;
-    showMsg('投籃時限！換球！', '#e44');
-    // Turnover
-    if (ballHolder.team === 'player') {
-      dropBall();
-      ball.vx = 3; ball.vy = 0;
-    } else {
-      dropBall();
-      ball.vx = -3; ball.vy = 0;
-    }
-    ballFree = true;
-    ballHolder = null;
+  if (shotClock<=0) {
+    shotClock=24;
+    showMsg('投籃時限！換球！','#e44');
+    const loser = ballHolder.team;
+    dropBall();
+    ball.vx = loser==='player' ? 3 : -3;
   }
 }
 
-// ─── RESET AFTER SCORE ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// AFTER SCORE RESET
+// ═══════════════════════════════════════════════════════
 function resetAfterScore(scorerTeam) {
-  ballFree = false;
-  ballInAir = false;
-  ball.z = 0;
-  ball.vx = 0; ball.vy = 0; ball.vz = 0;
-  ball.targetHoop = null;
-  // Loser team gets ball from their own hoop
-  const inboundTeam = scorerTeam === 'player' ? 'enemy' : 'player';
-  const hoop = getDefendHoop(inboundTeam);
-  ball.x = hoop.x + (inboundTeam === 'player' ? 80 : -80);
+  ballFree=false; ballInAir=false;
+  ball.z=0; ball.vx=0; ball.vy=0; ball.vz=0;
+  ball.targetHoop=null; ball._passTarget=null; ball._flightLeft=0;
+  const inTeam = scorerTeam==='player' ? 'enemy' : 'player';
+  const hoop   = defHoop(inTeam);
+  ball.x = hoop.x + (inTeam==='player' ? 80 : -80);
   ball.y = hoop.y;
-  ballHolder = { team: inboundTeam, idx: 0 };
-  if (inboundTeam === 'player') controlledIdx = 0;
-  shotClock = 24;
-  // Reposition players
-  const pTargets = [
-    { x: 250, y: CH/2 },
-    { x: 220, y: CH/2 - 90 },
-    { x: 220, y: CH/2 + 90 },
-  ];
-  const eTargets = [
-    { x: 650, y: CH/2 },
-    { x: 680, y: CH/2 - 90 },
-    { x: 680, y: CH/2 + 90 },
-  ];
-  for (let i = 0; i < 3; i++) {
-    players[i].x = pTargets[i].x;
-    players[i].y = pTargets[i].y;
-    players[3+i].x = eTargets[i].x;
-    players[3+i].y = eTargets[i].y;
+  ballHolder = { team:inTeam, idx:0 };
+  if (inTeam==='player') ctrlIdx=0;
+  shotClock=24;
+  const pPos=[{x:250,y:CH/2},{x:220,y:CH/2-90},{x:220,y:CH/2+90}];
+  const ePos=[{x:650,y:CH/2},{x:680,y:CH/2-90},{x:680,y:CH/2+90}];
+  for (let i=0;i<3;i++) {
+    players[i].x=pPos[i].x; players[i].y=pPos[i].y;
+    players[3+i].x=ePos[i].x; players[3+i].y=ePos[i].y;
   }
 }
 
-// ─── POWER CHARGE ────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// POWER CHARGE
+// ═══════════════════════════════════════════════════════
 function updatePowerCharge(dt) {
   if (!chargingShot) return;
-  shootingPower += powerDir * dt * 80;
-  if (shootingPower >= 100) { shootingPower = 100; powerDir = -1; }
-  if (shootingPower <= 0)   { shootingPower = 0;   powerDir =  1; }
-  updatePowerBarUI();
+  shootPow += powDir*dt*85;
+  if (shootPow>=100){ shootPow=100; powDir=-1; }
+  if (shootPow<=0)  { shootPow=0;   powDir=1;  }
+  document.getElementById('pw-wrap').style.display='flex';
+  document.getElementById('pw-fill').style.width=shootPow+'%';
 }
 
-// ─── GAME OVER ────────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// COOLDOWN UI
+// ═══════════════════════════════════════════════════════
+const MAX_CD = { z:1.6, x:2.0, c:2.2 };
+function updateCooldownUI(dt) {
+  cdZ=Math.max(0,cdZ-dt); cdX=Math.max(0,cdX-dt); cdC=Math.max(0,cdC-dt);
+  const box=document.getElementById('cd-box');
+  box.style.display='flex';
+  document.getElementById('cd-z').style.width=((1-cdZ/MAX_CD.z)*100)+'%';
+  document.getElementById('cd-x').style.width=((1-cdX/MAX_CD.x)*100)+'%';
+  document.getElementById('cd-c').style.width=((1-cdC/MAX_CD.c)*100)+'%';
+
+  // Update contest debuff timers
+  for (let i=3;i<6;i++) {
+    if (players[i]._contested>0) players[i]._contested-=dt;
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════
+function updateScoreUI() {
+  document.getElementById('sp').textContent=pScore;
+  document.getElementById('se').textContent=eScore;
+  document.getElementById('tp').textContent=`目標 ${goalScore} 分`;
+  document.getElementById('te').textContent=`目標 ${goalScore} 分`;
+  document.getElementById('goal-display').textContent=`先得 ${goalScore} 分獲勝`;
+}
+
+function updateShotClockUI() {
+  document.getElementById('sc').textContent=Math.ceil(shotClock);
+}
+
+let msgTO=null;
+function showMsg(text,color='#f4a020') {
+  const el=document.getElementById('msg');
+  el.textContent=text; el.style.color=color; el.style.borderColor=color; el.style.opacity='1';
+  clearTimeout(msgTO); msgTO=setTimeout(()=>{ el.style.opacity='0'; },1700);
+}
+
+// ═══════════════════════════════════════════════════════
+// GAME OVER
+// ═══════════════════════════════════════════════════════
 function endGame() {
-  gameRunning = false;
-  cancelAnimationFrame(animId);
-  const ov = document.getElementById('overlay');
-  const winner = playerScore > enemyScore ? '🏆 你贏了！' : playerScore < enemyScore ? '😤 對手獲勝' : '🤝 平局！';
-  const wcolor = playerScore > enemyScore ? '#f4a020' : playerScore < enemyScore ? '#e44' : '#fff';
-  ov.innerHTML = `
-    <h1 style="color:${wcolor}">${winner}</h1>
-    <div class="big-score"><span class="s1">${playerScore}</span> : <span class="s2">${enemyScore}</span></div>
-    <div style="display:flex;gap:8px;margin-bottom:20px;">
+  gameRunning=false; cancelAnimationFrame(animId);
+  const won   = pScore>=goalScore;
+  const title = won ? '🏆 你贏了！' : '😤 對手獲勝';
+  const color = won ? '#f4a020' : '#e44';
+  const ov=document.getElementById('overlay');
+  ov.innerHTML=`
+    <h1 style="color:${color}">${title}</h1>
+    <div class="big-score"><span class="s1">${pScore}</span> : <span class="s2">${eScore}</span></div>
+    <div class="row-opts">
+      <span>目標：</span>
+      <button class="diff-btn ${goalScore===5?'active':''}" data-goal="5">先得5分</button>
+      <button class="diff-btn ${goalScore===8?'active':''}" data-goal="8">先得8分</button>
+    </div>
+    <div class="row-opts">
+      <span>難度：</span>
       <button class="diff-btn ${difficulty==='easy'?'active':''}" data-diff2="easy">簡單</button>
       <button class="diff-btn ${difficulty==='medium'?'active':''}" data-diff2="medium">中度</button>
       <button class="diff-btn ${difficulty==='hard'?'active':''}" data-diff2="hard">困難</button>
     </div>
-    <button class="menu-btn" id="start-btn">再玩一局</button>
-  `;
-  ov.style.display = 'flex';
-  bindOverlayButtons();
+    <button class="menu-btn" id="start-btn">再玩一局</button>`;
+  ov.style.display='flex';
+  bindOverlay();
 }
 
-// ─── MAIN LOOP ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════════════════
 function loop(ts) {
   if (!gameRunning) return;
-  const dt = Math.min((ts - lastTime) / 1000, 0.05);
-  lastTime = ts;
-
-  // Game clock
-  gameTime -= dt;
-  if (gameTime <= 0) { gameTime = 0; updateTimerUI(); endGame(); return; }
+  const dt=Math.min((ts-lastTime)/1000, 0.05);
+  lastTime=ts;
 
   updateShotClock(dt);
-  updateTimerUI();
-
-  // Player input
-  updatePlayerMovement(dt);
+  updateShotClockUI();
+  updatePlayerMovement();
   updateTeammateAI(dt);
   updateEnemyAI(dt);
   updateBall(dt);
   updatePowerCharge(dt);
+  updateCooldownUI(dt);
   checkPickup();
 
-  // Draw
-  ctx.clearRect(0, 0, CW, CH);
+  ctx.clearRect(0,0,CW,CH);
   drawCourt();
   drawPassArrow();
-  drawShootIndicator();
   drawPlayers();
   drawBall();
 
-  animId = requestAnimationFrame(loop);
+  animId=requestAnimationFrame(loop);
 }
 
-// ─── START GAME ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════════
 function startGame() {
-  playerScore = 0;
-  enemyScore  = 0;
-  gameTime    = 180;
-  shotClock   = 24;
-  chargingShot = false;
-  shootingPower = 0;
-  ballInAir   = false;
-  ballFree    = false;
-  ball._passTarget = null;
-  ball.targetHoop  = null;
-  diffCfg = DIFF_CFG[difficulty];
-  updateScoreUI();
+  pScore=0; eScore=0; shotClock=24;
+  cdZ=0; cdX=0; cdC=0; contestActive=false;
+  chargingShot=false; shootPow=0;
+  ballInAir=false; ballFree=false;
+  cfg=DIFF[difficulty];
+  tmAiT=[0,0,0]; eAiT=0;
   initPlayers();
-  document.getElementById('overlay').style.display = 'none';
-  gameRunning = true;
-  lastTime = performance.now();
-  animId = requestAnimationFrame(loop);
+  updateScoreUI();
+  document.getElementById('overlay').style.display='none';
+  document.getElementById('cd-box').style.display='flex';
+  gameRunning=true;
+  lastTime=performance.now();
+  animId=requestAnimationFrame(loop);
 }
 
-// ─── DIFFICULTY BUTTONS ──────────────────────────────────────────────────────
-function bindDiffButtons() {
-  document.querySelectorAll('[data-diff]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      difficulty = btn.dataset.diff;
-      diffCfg = DIFF_CFG[difficulty];
-      document.querySelectorAll('[data-diff]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+// ═══════════════════════════════════════════════════════
+// BUTTON BINDINGS
+// ═══════════════════════════════════════════════════════
+function bindOverlay() {
+  document.querySelectorAll('[data-goal]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      goalScore=parseInt(b.dataset.goal);
+      document.querySelectorAll('[data-goal]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
     });
   });
-}
-
-function bindOverlayButtons() {
-  document.querySelectorAll('[data-diff2]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      difficulty = btn.dataset.diff2;
-      diffCfg = DIFF_CFG[difficulty];
-      document.querySelectorAll('[data-diff2]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+  document.querySelectorAll('[data-diff2]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      difficulty=b.dataset.diff2; cfg=DIFF[difficulty];
+      document.querySelectorAll('[data-diff2]').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
     });
   });
-  const sb = document.getElementById('start-btn');
+  const sb=document.getElementById('start-btn');
   if (sb) sb.addEventListener('click', startGame);
 }
 
-bindDiffButtons();
-bindOverlayButtons();
+document.querySelectorAll('[data-diff]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    difficulty=b.dataset.diff; cfg=DIFF[difficulty];
+    document.querySelectorAll('[data-diff]').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+  });
+});
 
-// Initial court draw
+bindOverlay();
 drawCourt();
 </script>
 </body>
