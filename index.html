@@ -2,18 +2,111 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>3v3 街頭籃球</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body {
   background:#1a1a2e;
   display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
+  align-items:center; justify-content:flex-start;
   min-height:100vh;
   font-family:'Arial Black',sans-serif;
   color:#fff; overflow:hidden;
-  user-select:none;
+  user-select:none; touch-action:none;
+}
+/* ── 遊戲主容器縮放 ── */
+#game-wrap {
+  transform-origin: top center;
+  will-change: transform;
+  flex-shrink: 0;
+}
+/* ── 手機控制區 ── */
+#mobile-controls {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 170px;
+  background: linear-gradient(transparent, rgba(10,10,25,0.95));
+  z-index: 200;
+  pointer-events: none;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+/* 搖桿區 */
+#joy-wrap {
+  position: absolute;
+  bottom: 20px; left: 20px;
+  width: 130px; height: 130px;
+  pointer-events: all;
+}
+#joy-base {
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+  border: 2.5px solid rgba(255,255,255,0.25);
+  position: relative;
+}
+#joy-thumb {
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: rgba(244,160,32,0.75);
+  border: 2px solid #f4a020;
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  transition: box-shadow 0.1s;
+  pointer-events: none;
+}
+#joy-thumb.active { box-shadow: 0 0 16px #f4a020; }
+/* 按鈕區 */
+#btn-wrap {
+  position: absolute;
+  bottom: 18px; right: 18px;
+  display: grid;
+  grid-template-columns: 64px 64px;
+  grid-template-rows: 64px 64px;
+  gap: 10px;
+  pointer-events: all;
+}
+.mBtn {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  border: 2px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-size: 10px;
+  font-family: 'Arial Black', sans-serif;
+  font-weight: bold;
+  display: flex;
+  flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: background 0.1s, transform 0.1s;
+  pointer-events: all;
+}
+.mBtn .mIcon { font-size: 20px; line-height: 1; }
+.mBtn .mLabel { font-size: 9px; color: #aaa; }
+.mBtn:active, .mBtn.pressed {
+  background: rgba(244,160,32,0.35);
+  border-color: #f4a020;
+  transform: scale(0.90);
+}
+#mBtn-shoot { border-color: #f4a020; background: rgba(244,160,32,0.2); }
+#mBtn-skill { border-color: #ffe000; }
+#mBtn-steal { border-color: #4ef; }
+#mBtn-pass  { border-color: #8cf; }
+/* 顯示控制提示只在桌機 */
+@media (hover:none) and (pointer:coarse) {
+  #mobile-controls { display: block; }
+  #controls-hint   { display: none; }
+  body { justify-content: flex-start; }
 }
 #ui-top {
   display:flex; align-items:center; justify-content:space-between;
@@ -134,8 +227,13 @@ canvas {
 
 /* ── Power bar ── */
 #pw-wrap {
-  position:fixed; left:50%; transform:translateX(-50%); bottom:135px;
-  width:170px; display:none; flex-direction:column; align-items:center; z-index:50;
+  position:fixed; left:50%; transform:translateX(-50%); bottom:180px;
+  width:170px; display:none; flex-direction:column; align-items:center; z-index:201;
+}
+@media (hover:none) and (pointer:coarse) {
+  #skills-bar { left: auto; right: 8px; top: auto; bottom: 185px; transform: none; }
+  #pw-wrap { bottom: 185px; }
+  #msg { top: 80px; }
 }
 #pw-label { font-size:12px; color:#f4a020; margin-bottom:4px; }
 #pw-bg { width:170px; height:15px; background:#333; border-radius:8px; border:1px solid #555; overflow:hidden; }
@@ -145,6 +243,7 @@ canvas {
 </head>
 <body>
 
+<div id="game-wrap">
 <div id="ui-top">
   <div class="score-box">
     <div class="label">我方</div>
@@ -179,6 +278,30 @@ canvas {
     <button class="diff-btn" data-diff="medium">中度</button>
     <button class="diff-btn" data-diff="hard">困難</button>
     <button class="diff-btn" id="music-btn" style="margin-left:8px" onclick="toggleMusic()">🎸 音樂</button>
+  </div>
+</div>
+</div><!-- /#game-wrap -->
+
+<!-- 手機控制區 -->
+<div id="mobile-controls">
+  <div id="joy-wrap">
+    <div id="joy-base">
+      <div id="joy-thumb"></div>
+    </div>
+  </div>
+  <div id="btn-wrap">
+    <button class="mBtn" id="mBtn-steal" ontouchstart="mBtnDown('l',this)" ontouchend="mBtnUp('l',this)">
+      <span class="mIcon">🖐️</span><span class="mLabel">搶斷</span>
+    </button>
+    <button class="mBtn" id="mBtn-skill" ontouchstart="mBtnDown('1',this)" ontouchend="mBtnUp('1',this)">
+      <span class="mIcon">⭐</span><span class="mLabel">技能</span>
+    </button>
+    <button class="mBtn" id="mBtn-pass" ontouchstart="mBtnDown('k',this)" ontouchend="mBtnUp('k',this)">
+      <span class="mIcon">🤝</span><span class="mLabel">傳/換</span>
+    </button>
+    <button class="mBtn" id="mBtn-shoot" ontouchstart="mShootDown(this)" ontouchend="mShootUp(this)">
+      <span class="mIcon">🏀</span><span class="mLabel">投籃</span>
+    </button>
   </div>
 </div>
 
@@ -2070,6 +2193,105 @@ function roundRect(ctx, x, y, w, h, r) {
 
 bindOverlay();
 drawCourt();
+
+// ═══════════════════════════════════════════════════════
+// 手機版：縮放 + 虛擬搖桿 + 觸控按鈕
+// ═══════════════════════════════════════════════════════
+const gameWrap = document.getElementById('game-wrap');
+
+function scaleGame() {
+  const isMobile = window.innerWidth < 920;
+  if (!isMobile) {
+    gameWrap.style.transform = '';
+    return;
+  }
+  const scaleW = window.innerWidth / 920;
+  const mobCtrlH = 170;
+  const availH = window.innerHeight - mobCtrlH;
+  const gameH = 620; // approx total game height
+  const scaleH = availH / gameH;
+  const s = Math.min(scaleW, scaleH, 1);
+  gameWrap.style.transform = `scale(${s})`;
+  gameWrap.style.transformOrigin = 'top center';
+  // compensate for scale shrinking the element's layout size
+  gameWrap.style.marginBottom = `${(s - 1) * gameH}px`;
+}
+scaleGame();
+window.addEventListener('resize', scaleGame);
+
+// ── 虛擬搖桿 ──────────────────────────────────────────
+const joyWrap  = document.getElementById('joy-wrap');
+const joyThumb = document.getElementById('joy-thumb');
+const JOY_R = 45; // max thumb travel radius
+let joyTouchId = null;
+let joyOriginX = 0, joyOriginY = 0;
+
+function getJoyCenter() {
+  const r = joyWrap.getBoundingClientRect();
+  return { x: r.left + r.width/2, y: r.top + r.height/2 };
+}
+
+joyWrap.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (joyTouchId !== null) return;
+  const t = e.changedTouches[0];
+  joyTouchId = t.identifier;
+  const c = getJoyCenter();
+  joyOriginX = c.x; joyOriginY = c.y;
+  joyThumb.classList.add('active');
+}, { passive: false });
+
+joyWrap.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier !== joyTouchId) continue;
+    const dx = t.clientX - joyOriginX;
+    const dy = t.clientY - joyOriginY;
+    const d  = Math.hypot(dx, dy);
+    const cx = d > JOY_R ? (dx/d)*JOY_R : dx;
+    const cy = d > JOY_R ? (dy/d)*JOY_R : dy;
+    joyThumb.style.transform = `translate(calc(-50% + ${cx}px), calc(-50% + ${cy}px))`;
+    const thr = JOY_R * 0.25;
+    keys['w'] = dy < -thr; keys['s'] = dy > thr;
+    keys['a'] = dx < -thr; keys['d'] = dx > thr;
+  }
+}, { passive: false });
+
+function joyRelease() {
+  joyTouchId = null;
+  joyThumb.style.transform = 'translate(-50%,-50%)';
+  joyThumb.classList.remove('active');
+  keys['w']=keys['s']=keys['a']=keys['d']=false;
+}
+joyWrap.addEventListener('touchend',   e => { for(const t of e.changedTouches) if(t.identifier===joyTouchId) joyRelease(); }, { passive: false });
+joyWrap.addEventListener('touchcancel',e => { for(const t of e.changedTouches) if(t.identifier===joyTouchId) joyRelease(); }, { passive: false });
+
+// ── 觸控按鈕 ──────────────────────────────────────────
+function mBtnDown(key, el) {
+  el.classList.add('pressed');
+  onKeyDown({ key, preventDefault:()=>{} });
+  keys[key.toLowerCase()] = true;
+}
+function mBtnUp(key, el) {
+  el.classList.remove('pressed');
+  onKeyUp({ key });
+  keys[key.toLowerCase()] = false;
+}
+function mShootDown(el) {
+  el.classList.add('pressed');
+  onKeyDown({ key:'j', preventDefault:()=>{} });
+  keys['j'] = true;
+}
+function mShootUp(el) {
+  el.classList.remove('pressed');
+  onKeyUp({ key:'j' });
+  keys['j'] = false;
+}
+
+// 防止手機上的預設捲動
+document.addEventListener('touchmove', e => {
+  if (e.target.closest('#mobile-controls') || e.target === canvas) e.preventDefault();
+}, { passive: false });
 </script>
 </body>
 </html>
