@@ -294,10 +294,11 @@ let tmAiT = [0, 0, 0];
 // INIT
 // ═══════════════════════════════════════════════════════
 function mkPlayer(x, y, team, idx) {
-  return { x, y, team, idx, radius:16,
+  return { x, y, px:x, py:y, moveSpd:0, // px/py = previous pos, moveSpd = velocity
+           team, idx, radius:16,
            color: team==='player' ? '#27ae60' : '#e74c3c',
            number: idx+1,
-           stealCd:0  // per-player steal cooldown (for enemy AI)
+           stealCd:0
          };
 }
 
@@ -489,11 +490,15 @@ function shootBall(ref, pow) {
   const powErr = Math.abs(pow/100 - 0.65) * 0.55;
   let made = Math.random() < clamp(acc - powErr, 0.04, 0.97);
 
-  // ── 技能判定 ──
+  // ── 玩家技能判定 ──
   if (ref.team === 'player') {
     if (skills.y.active && three)  { made = true; consumeSkill('y'); }
     if (skills.g.active && !three) { made = true; consumeSkill('g'); }
-    // 若啟動了不對應的技能，不消耗（讓玩家繼續持有）
+  }
+  // ── 對手技能判定 ──
+  if (ref.team === 'enemy' && enemySkill.active) {
+    if (enemyChosenSkill === 'y' && three)  { made = true; enemySkill.active=false; enemySkill.cd=SKILL_MAX_CD.y; showMsg('對手使用🟡三分必進！','#e44'); }
+    if (enemyChosenSkill === 'g' && !three) { made = true; enemySkill.active=false; enemySkill.cd=SKILL_MAX_CD.g; showMsg('對手使用🟢兩分必進！','#e44'); }
   }
 
   ballHolder=null; ballFree=false; ballInAir=true;
@@ -589,9 +594,18 @@ function updateBall(dt) {
         if (pScore>=goalScore || eScore>=goalScore) { endGame(); return; }
         resetAfterScore(team);
       } else {
-        // 紫色技能：對方投籃未進 → 自動給我方最近球員
+        // 紫色技能判定
         const missTeam = ball.targetHoop.shooter.team;
-        if (skills.p.active && missTeam === 'enemy') {
+        // 對手紫色：我方投籃沒進 → 球給對手
+        if (enemyChosenSkill === 'p' && enemySkill.active && missTeam === 'player') {
+          let nearI=0, nearD=9999;
+          for (let i=0;i<3;i++) { const d2=dist(players[3+i],ball); if(d2<nearD){nearD=d2;nearI=i;} }
+          catchBall({team:'enemy', idx:nearI});
+          showMsg('對手🟣自動搶板！','#e44');
+          enemySkill.active=false; enemySkill.cd=SKILL_MAX_CD.p;
+        }
+        // 玩家紫色：對手投籃沒進 → 球給我方
+        else if (skills.p.active && missTeam === 'enemy') {
           // 找距離最近的我方球員
           let nearI=0, nearD=9999;
           for (let i=0;i<3;i++) {
@@ -793,8 +807,26 @@ function bestPassFor(team, selfIdx) {
 // ═══════════════════════════════════════════════════════
 function updateEnemyAI(dt) {
   eAiT -= dt;
+  eSkillUseTimer -= dt;
+  if (enemySkill.cd > 0) enemySkill.cd = Math.max(0, enemySkill.cd - dt);
+
   const spd = cfg.spd;
   let carrier = (ballHolder && ballHolder.team==='enemy') ? ballHolder.idx : -1;
+
+  // AI 技能決策
+  if (!enemySkill.active && enemySkill.cd <= 0 && eSkillUseTimer <= 0 && carrier >= 0) {
+    const p    = players[3 + carrier];
+    const hoop = atkHoop('enemy');
+    const d    = dist(p, hoop);
+    const three = is3pt(p.x, p.y, 'enemy');
+    const useChance = { easy:0.15, medium:0.30, hard:0.55 }[difficulty];
+    if (Math.random() < useChance) {
+      if (enemyChosenSkill === 'y' && three && d < cfg.shootDist + 50)  enemySkill.active = true;
+      if (enemyChosenSkill === 'g' && !three && d < cfg.shootDist)      enemySkill.active = true;
+      if (enemyChosenSkill === 'p' && ballHolder && ballHolder.team==='player') enemySkill.active = true;
+    }
+    eSkillUseTimer = 3.0;
+  }
 
   for (let i=0;i<3;i++) {
     const p = players[3+i];
@@ -857,7 +889,13 @@ const skills = {
   g: { active:false, cd:0 }, // 綠：兩分必進
   p: { active:false, cd:0 }, // 紫：對方未進自動搶板
 };
-let chosenSkill = 'y'; // 本局選擇的技能
+let chosenSkill = 'y'; // 本局玩家選擇的技能
+
+// ── 對手技能 ──────────────────────────────────────────
+const SKILL_KEYS = ['y','g','p'];
+let enemyChosenSkill = 'y'; // 對手本局技能（開局隨機）
+const enemySkill = { active:false, cd:0 };
+let eSkillUseTimer = 0; // AI 使用技能的決策計時
 
 function activateSkill(id) {
   if (id !== chosenSkill) return; // 本局只能用選定的技能
@@ -916,34 +954,44 @@ function updateSkillCooldowns(dt) {
 let stealCdPlayer = 0;
 
 function doSteal() {
-  if (stealCdPlayer > 0) { showMsg(`搶斷冷卻中…`, '#888'); return; }
+  if (stealCdPlayer > 0) { showMsg('搶斷冷卻中…', '#888'); return; }
   const me = players[ctrlIdx];
+
   if (ballHolder && ballHolder.team === 'enemy') {
     const bh = getP(ballHolder);
-    if (bh && dist(me, bh) < 42) {
-      const chance = 0.55 - (dist(me, bh) / 42) * 0.2;
-      if (Math.random() < chance) {
-        dropBall();
-        showMsg('🔥 搶斷成功！', '#4ef');
-      } else {
-        showMsg('搶斷失敗', '#888');
-      }
-    } else {
-      showMsg('距離太遠', '#888');
+    if (!bh) return;
+    const d = dist(me, bh);
+    if (d > 42) { showMsg('距離太遠', '#888'); stealCdPlayer=0.5; return; }
+
+    // 關鍵：對手必須在移動中才能搶斷
+    const isMoving = bh.moveSpd > 0.8;
+    if (!isMoving) {
+      showMsg('對手站著，搶不了！', '#888');
+      stealCdPlayer = 0.5;
+      return;
     }
+
+    const chance = 0.60 - (d / 42) * 0.2;
+    if (Math.random() < chance) {
+      dropBall();
+      showMsg('🔥 搶斷成功！', '#4ef');
+    } else {
+      showMsg('搶斷失敗', '#888');
+    }
+    stealCdPlayer = 1.5;
+
   } else if (ballInAir && ball._passTarget && ball._passTarget.team === 'enemy') {
-    // Intercept enemy pass
     const d = dist(me, ball);
     if (d < 50) {
-      catchBall({ team: 'player', idx: ctrlIdx });
+      catchBall({ team:'player', idx:ctrlIdx });
       showMsg('🔥 截球！', '#4ef');
     } else {
       showMsg('沒截到', '#888');
     }
+    stealCdPlayer = 1.5;
   } else {
-    showMsg('沒有可搶的球', '#888');
+    showMsg('對手沒有球', '#888');
   }
-  stealCdPlayer = 1.5;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1118,6 +1166,11 @@ function loop(ts) {
 
   updateShotClock(dt);
   updateShotClockUI();
+  // 更新每個球員的移動速度（用來判斷搶斷）
+  players.forEach(p => {
+    p.moveSpd = Math.hypot(p.x - p.px, p.y - p.py);
+    p.px = p.x; p.py = p.y;
+  });
   updatePlayerMovement();
   updateTeammateAI(dt);
   updateEnemyAI(dt);
@@ -1132,6 +1185,7 @@ function loop(ts) {
   drawPassArrow();
   drawPlayers();
   drawBall();
+  drawEnemySkillHUD();
 
   animId=requestAnimationFrame(loop);
 }
@@ -1143,6 +1197,9 @@ function startGame() {
   pScore=0; eScore=0; shotClock=24;
   chargingShot=false; shootPow=0; stealCdPlayer=0; lastTouchTeam='player';
   ['y','g','p'].forEach(id=>{ skills[id].active=false; skills[id].cd=0; });
+  // 對手隨機選技能
+  enemyChosenSkill = SKILL_KEYS[Math.floor(Math.random() * 3)];
+  enemySkill.active=false; enemySkill.cd=0; eSkillUseTimer=5;
   updateSkillUI();
   ballInAir=false; ballFree=false;
   cfg=DIFF[difficulty];
@@ -1199,6 +1256,47 @@ document.querySelectorAll('[data-diff]').forEach(b=>{
     b.classList.add('active');
   });
 });
+
+function drawEnemySkillHUD() {
+  if (!gameRunning) return;
+  const icons = { y:'🟡', g:'🟢', p:'🟣' };
+  const names = { y:'三分必進', g:'兩分必進', p:'自動搶板' };
+  const icon  = icons[enemyChosenSkill];
+  const name  = names[enemyChosenSkill];
+  const x = CW - 8, y = 8;
+  const w = 110, h = 36;
+
+  ctx.save();
+  ctx.fillStyle = enemySkill.active ? 'rgba(180,0,0,0.75)' : 'rgba(0,0,0,0.55)';
+  ctx.strokeStyle = enemySkill.active ? '#ff4040' : '#555';
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, x-w, y, w, h, 8);
+  ctx.fill(); ctx.stroke();
+
+  ctx.font = '13px Arial'; ctx.fillStyle = '#fff';
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.fillText(`${icon} 對手：${name}`, x-w+8, y+h/2);
+
+  // CD bar
+  if (enemySkill.cd > 0) {
+    const pct = 1 - enemySkill.cd / SKILL_MAX_CD[enemyChosenSkill];
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(x-w+6, y+h-7, w-12, 4);
+    ctx.fillStyle = '#e44';
+    ctx.fillRect(x-w+6, y+h-7, (w-12)*pct, 4);
+  }
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.lineTo(x+w-r, y); ctx.quadraticCurveTo(x+w, y, x+w, y+r);
+  ctx.lineTo(x+w, y+h-r); ctx.quadraticCurveTo(x+w, y+h, x+w-r, y+h);
+  ctx.lineTo(x+r, y+h); ctx.quadraticCurveTo(x, y+h, x, y+h-r);
+  ctx.lineTo(x, y+r); ctx.quadraticCurveTo(x, y, x+r, y);
+  ctx.closePath();
+}
 
 bindOverlay();
 drawCourt();
