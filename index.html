@@ -224,6 +224,14 @@ canvas {
     <button class="diff-btn" data-diff2="medium">中度</button>
     <button class="diff-btn" data-diff2="hard">困難</button>
   </div>
+  <div class="row-opts" style="flex-direction:column;align-items:center;gap:8px;margin-bottom:4px;">
+    <span style="font-size:14px;color:#ccc;letter-spacing:1px;">選擇本局技能（只能選一個）</span>
+    <div style="display:flex;gap:12px;">
+      <button class="skill-pick active" data-sk="y" style="background:rgba(255,224,0,0.15);border:2px solid #ffe000;color:#ffe000;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-family:inherit;">🟡 三分必進</button>
+      <button class="skill-pick" data-sk="g" style="background:rgba(0,255,96,0.08);border:2px solid #444;color:#888;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-family:inherit;">🟢 兩分必進</button>
+      <button class="skill-pick" data-sk="p" style="background:rgba(160,32,240,0.08);border:2px solid #444;color:#888;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-family:inherit;">🟣 自動搶板</button>
+    </div>
+  </div>
   <button class="menu-btn" id="start-btn">開始遊戲</button>
 </div>
 
@@ -849,11 +857,13 @@ const skills = {
   g: { active:false, cd:0 }, // 綠：兩分必進
   p: { active:false, cd:0 }, // 紫：對方未進自動搶板
 };
+let chosenSkill = 'y'; // 本局選擇的技能
 
 function activateSkill(id) {
+  if (id !== chosenSkill) return; // 本局只能用選定的技能
   const sk = skills[id];
-  if (sk.cd > 0)     { showMsg('技能冷卻中…', '#888'); return; }
-  if (sk.active)     { showMsg('技能已啟動！', '#888'); return; }
+  if (sk.cd > 0)  { showMsg('技能冷卻中…', '#888'); return; }
+  if (sk.active)  { showMsg('技能已啟動！', '#888'); return; }
   const names = { y:'🟡 三分必進！', g:'🟢 兩分必進！', p:'🟣 自動搶板！' };
   const cols  = { y:'#ffe000', g:'#00ff60', p:'#c050ff' };
   sk.active = true;
@@ -868,11 +878,12 @@ function consumeSkill(id) {
 }
 
 function updateSkillUI() {
-  const ids = ['y','g','p'];
-  ids.forEach(id => {
+  ['y','g','p'].forEach(id => {
     const slot = document.getElementById('skill-'+id);
     const cov  = document.getElementById('sk-cd-'+id);
     const sk   = skills[id];
+    // 只顯示本局選定的技能
+    slot.style.display = (id === chosenSkill) ? 'flex' : 'none';
     slot.classList.remove('ready','active','cooling');
     if (sk.active) {
       slot.classList.add('active');
@@ -1084,6 +1095,14 @@ function endGame() {
       <button class="diff-btn ${difficulty==='medium'?'active':''}" data-diff2="medium">中度</button>
       <button class="diff-btn ${difficulty==='hard'?'active':''}" data-diff2="hard">困難</button>
     </div>
+    <div class="row-opts" style="flex-direction:column;align-items:center;gap:8px;">
+      <span style="font-size:13px;color:#ccc;">選擇本局技能</span>
+      <div style="display:flex;gap:12px;">
+        <button class="skill-pick${chosenSkill==='y'?' sk-sel':''}" data-sk="y" style="border:2px solid ${chosenSkill==='y'?'#ffe000':'#444'};color:${chosenSkill==='y'?'#ffe000':'#888'};background:${chosenSkill==='y'?'rgba(255,224,0,0.15)':'transparent'};padding:8px 14px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">🟡 三分必進</button>
+        <button class="skill-pick${chosenSkill==='g'?' sk-sel':''}" data-sk="g" style="border:2px solid ${chosenSkill==='g'?'#00ff60':'#444'};color:${chosenSkill==='g'?'#00ff60':'#888'};background:${chosenSkill==='g'?'rgba(0,255,96,0.08)':'transparent'};padding:8px 14px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">🟢 兩分必進</button>
+        <button class="skill-pick${chosenSkill==='p'?' sk-sel':''}" data-sk="p" style="border:2px solid ${chosenSkill==='p'?'#c050ff':'#444'};color:${chosenSkill==='p'?'#c050ff':'#888'};background:${chosenSkill==='p'?'rgba(160,32,240,0.15)':'transparent'};padding:8px 14px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">🟣 自動搶板</button>
+      </div>
+    </div>
     <button class="menu-btn" id="start-btn">再玩一局</button>`;
   ov.style.display='flex';
   bindOverlay();
@@ -1153,6 +1172,20 @@ function bindOverlay() {
       difficulty=b.dataset.diff2; cfg=DIFF[difficulty];
       document.querySelectorAll('[data-diff2]').forEach(x=>x.classList.remove('active'));
       b.classList.add('active');
+    });
+  });
+  // 技能選擇
+  const skColors = { y:'#ffe000', g:'#00ff60', p:'#c050ff' };
+  const skBg     = { y:'rgba(255,224,0,0.15)', g:'rgba(0,255,96,0.08)', p:'rgba(160,32,240,0.15)' };
+  document.querySelectorAll('[data-sk]').forEach(b=>{
+    b.addEventListener('click',()=>{
+      chosenSkill = b.dataset.sk;
+      document.querySelectorAll('[data-sk]').forEach(x=>{
+        x.style.borderColor='#444'; x.style.color='#888'; x.style.background='transparent';
+      });
+      b.style.borderColor = skColors[chosenSkill];
+      b.style.color       = skColors[chosenSkill];
+      b.style.background  = skBg[chosenSkill];
     });
   });
   const sb=document.getElementById('start-btn');
