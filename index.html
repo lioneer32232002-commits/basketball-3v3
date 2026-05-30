@@ -94,19 +94,6 @@ canvas {
 #pw-bg { width:170px; height:15px; background:#333; border-radius:8px; border:1px solid #555; overflow:hidden; }
 #pw-fill { height:100%; background:linear-gradient(90deg,#4ef,#f4a020,#e44); width:0%; border-radius:8px; }
 
-/* ── Pass hint ── */
-#pass-hint {
-  position:fixed; right:calc(50% - 450px + 8px); bottom:138px;
-  display:none; flex-direction:column; gap:5px; z-index:50;
-  background:rgba(0,0,0,0.7); padding:8px 12px; border-radius:8px;
-  border:1px solid #555; font-size:12px;
-}
-.ph-row { display:flex; align-items:center; gap:7px; color:#ccc; }
-.ph-key { width:22px; height:22px; background:#333; border:1px solid #f4a020; border-radius:4px;
-  display:flex; align-items:center; justify-content:center; font-weight:bold; color:#f4a020; font-size:11px; }
-.ph-dot { width:14px; height:14px; border-radius:50%; display:inline-block; }
-.ph-dot.green { background:#27ae60; }
-.ph-dot.red   { background:#e74c3c; }
 </style>
 </head>
 <body>
@@ -134,13 +121,9 @@ canvas {
 <div id="ui-bottom">
   <div id="controls-hint">
     <span><b>WASD</b> 移動</span>
-    <span><b>J</b> 投籃</span>
-    <span><b>空白</b> 自動傳球</span>
-    <span><b>Z</b> 傳給1號</span>
-    <span><b>X</b> 傳給2號</span>
-    <span><b>C</b> 傳給3號</span>
+    <span><b>J</b> 投籃（按住蓄力）</span>
+    <span><b>K</b> 傳球 / 換人</span>
     <span><b>L</b> 搶斷</span>
-    <span><b>K</b> 換人</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center">
     <span style="font-size:11px;color:#888">難度：</span>
@@ -152,11 +135,6 @@ canvas {
 
 <div id="msg"></div>
 <div id="pw-wrap"><div id="pw-label">投籃力道</div><div id="pw-bg"><div id="pw-fill"></div></div></div>
-<div id="pass-hint">
-  <div class="ph-row"><div class="ph-key">Z</div><span class="ph-dot green"></span><span id="ph-z">傳給 1 號</span></div>
-  <div class="ph-row"><div class="ph-key">X</div><span class="ph-dot green"></span><span id="ph-x">傳給 2 號</span></div>
-  <div class="ph-row"><div class="ph-key">C</div><span class="ph-dot green"></span><span id="ph-c">傳給 3 號</span></div>
-</div>
 
 <!-- ── Main Menu ── -->
 <div id="overlay">
@@ -773,63 +751,40 @@ function doSteal() {
 }
 
 // ═══════════════════════════════════════════════════════
-// ZXC — DIRECTED PASS TO JERSEY NUMBER
-// ═══════════════════════════════════════════════════════
-// Z=傳給1號  X=傳給2號  C=傳給3號
-function doDirectPass(jerseyNum) {
-  // Only works when controlled player holds the ball
-  if (!ballHolder || ballHolder.team!=='player' || ballHolder.idx!==ctrlIdx) return;
-  const targetIdx = jerseyNum - 1; // jersey 1→idx 0, 2→idx 1, 3→idx 2
-  if (targetIdx === ctrlIdx) {
-    showMsg('那是你自己！','#888'); return;
-  }
-  passBall(ballHolder, targetIdx);
-  showMsg(`傳給 ${jerseyNum} 號 ✈️`);
-}
-
-// ═══════════════════════════════════════════════════════
 // KEY HANDLERS
 // ═══════════════════════════════════════════════════════
 function onKeyDown(e) {
   if (!gameRunning) return;
   const k = e.key.toLowerCase();
-  if (['j','z','x','c',' '].includes(k)) e.preventDefault();
+  if (['j','k','l'].includes(k)) e.preventDefault();
 
-  // Auto-pass (space)
-  if (k===' ') {
-    if (ballHolder && ballHolder.team==='player' && ballHolder.idx===ctrlIdx) {
-      const mate = bestPassFor('player', ctrlIdx);
-      if (mate>=0) { passBall(ballHolder, mate); showMsg('傳球！'); }
-    }
-  }
-
-  // Directed pass: Z=1號, X=2號, C=3號
-  if (k==='z') doDirectPass(1);
-  if (k==='x') doDirectPass(2);
-  if (k==='c') doDirectPass(3);
-
-  // Steal
-  if (k==='l') doSteal();
-
-  // Shoot charge
+  // J — shoot (start charging)
   if (k==='j') {
     if (ballHolder && ballHolder.team==='player' && ballHolder.idx===ctrlIdx) {
       chargingShot=true; shootPow=0; powDir=1;
     }
   }
 
-  // Switch controlled player
+  // K — context: holding ball → pass; no ball → switch player
   if (k==='k') {
-    let bestI=ctrlIdx, bestD=9999;
-    for (let i=0;i<3;i++) {
-      if (i===ctrlIdx) continue;
-      const p=players[i];
-      const ref=ballFree?ball:(getP(ballHolder)||ball);
-      const d=dist(p,ref);
-      if (d<bestD){ bestD=d; bestI=i; }
+    const iHaveBall = ballHolder && ballHolder.team==='player' && ballHolder.idx===ctrlIdx;
+    if (iHaveBall) {
+      const mate = bestPassFor('player', ctrlIdx);
+      if (mate>=0) { passBall(ballHolder, mate); showMsg('傳球！'); }
+    } else {
+      let bestI=ctrlIdx, bestD=9999;
+      for (let i=0;i<3;i++) {
+        if (i===ctrlIdx) continue;
+        const ref=ballFree?ball:(getP(ballHolder)||ball);
+        const d=dist(players[i], ref);
+        if (d<bestD){ bestD=d; bestI=i; }
+      }
+      ctrlIdx=bestI;
     }
-    ctrlIdx=bestI;
   }
+
+  // L — steal
+  if (k==='l') doSteal();
 }
 
 function onKeyUp(e) {
@@ -893,29 +848,6 @@ function updatePowerCharge(dt) {
   document.getElementById('pw-fill').style.width=shootPow+'%';
 }
 
-// ═══════════════════════════════════════════════════════
-// PASS HINT UI
-// ═══════════════════════════════════════════════════════
-function updatePassHintUI() {
-  const box = document.getElementById('pass-hint');
-  const iHoldBall = ballHolder && ballHolder.team==='player' && ballHolder.idx===ctrlIdx;
-  box.style.display = iHoldBall ? 'flex' : 'none';
-  if (!iHoldBall) return;
-  // Highlight which jersey numbers are available (not self)
-  const labels = ['ph-z','ph-x','ph-c'];
-  for (let j=0;j<3;j++) {
-    const jerseyIdx = j; // jersey 1,2,3 → idx 0,1,2
-    const el = document.getElementById(labels[j]);
-    const dot = el.previousElementSibling;
-    if (jerseyIdx === ctrlIdx) {
-      dot.style.background='#555';
-      el.style.color='#555';
-    } else {
-      dot.style.background='#27ae60';
-      el.style.color='#ccc';
-    }
-  }
-}
 
 // ═══════════════════════════════════════════════════════
 // UI HELPERS
@@ -982,7 +914,6 @@ function loop(ts) {
   updateEnemyAI(dt);
   updateBall(dt);
   updatePowerCharge(dt);
-  updatePassHintUI();
   stealCdPlayer = Math.max(0, stealCdPlayer - dt);
   checkPickup();
 
