@@ -171,9 +171,7 @@ canvas {
     <span><b>J</b> 投籃</span>
     <span><b>K</b> 傳球/換人</span>
     <span><b>L</b> 搶斷</span>
-    <span><b style="color:#ffe000">1</b> 三分必進</span>
-    <span><b style="color:#00ff60">2</b> 兩分必進</span>
-    <span><b style="color:#c050ff">3</b> 自動搶板</span>
+    <span><b style="color:#ffe000">1</b> 技能</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center">
     <span style="font-size:11px;color:#888">難度：</span>
@@ -397,13 +395,26 @@ let lastTime     = 0, animId = null;
 let lastTouchTeam = 'player';
 
 // ── Fun extras ──────────────────────────────────────
-let floatingTexts = [];       // 浮動文字
-let ballTrail     = [];       // 球軌跡
-let screenShake   = 0;        // 畫面震動
-let playerStreak  = 0;        // 玩家連進球數
-let crowdEnergy   = 0;        // 觀眾能量 0-100
-let onFire        = false;    // 連進火焰狀態
-let shakeX = 0, shakeY = 0;  // 震動偏移
+let floatingTexts = [];
+let ballTrail     = [];
+let screenShake   = 0;
+let playerStreak  = 0;
+let crowdEnergy   = 0;
+let onFire        = false;
+let shakeX = 0, shakeY = 0;
+let overtime      = false;     // 加時賽
+let confettiParts = [];        // 彩帶粒子
+let commentaryTimer = 0;       // 解說計時
+
+// 球員名字
+const PLAYER_NAMES = ['閃電⚡','神準🎯','飛毛腿🦵'];
+const ENEMY_NAMES  = ['影子👤','幽靈👻','子彈💨'];
+
+// 解說語句庫
+const COMMENT_GOOD = ['太厲害了！','根本NBA！','無解的投籃！','不可思議！','教科書等級！'];
+const COMMENT_MISS = ['差一點點！','剛好打鐵！','再來一次！','手感不好？','繼續加油！'];
+const COMMENT_STEAL= ['完美時機！','讀心術？！','千鈞一髮！'];
+const COMMENT_FIRE = ['🔥 他起火了！','停不下來了！','連進剋星！','全場最MVP！'];
 
 // Ball
 let ball = { x:CW/2, y:CH/2, z:0, vx:0, vy:0, vz:0,
@@ -490,9 +501,13 @@ function is3pt(x, y, team) { return dist({x,y}, atkHoop(team)) > 195; }
 
 function shotAcc(d, team, shooterObj=null) {
   let base = team==='player' ? 0.78 : cfg.shotAcc;
-  if (shooterObj) base += shooterObj.accBonus || 0;
-  if (team==='player' && onFire) base += 0.12; // 連進火焰加成
-  if (shooterObj && shooterObj.fatigue > 0.5) base -= shooterObj.fatigue * 0.1; // 疲勞懲罰
+  if (shooterObj) base += (shooterObj.accBonus || 0);
+  if (team==='player' && onFire) base += 0.12;
+  if (shooterObj && shooterObj.fatigue > 0.5) base -= shooterObj.fatigue * 0.1;
+  // 回追加成：落後2+分時稍微提升準度（逆轉魂！）
+  if (team==='player' && (eScore - pScore) >= 2) base += Math.min(0.1, (eScore-pScore)*0.03);
+  // 觀眾沸騰加成
+  if (team==='player' && crowdEnergy >= 80) base += 0.05;
   return clamp(base - Math.max(0,(d-100)/420), 0.08, 0.97);
 }
 
@@ -797,14 +812,21 @@ function updateBall(dt) {
           pScore++;
           playerStreak++;
           addFloat('+1', hoop.x, hoop.y, '#f4a020', 28);
+          const pName = PLAYER_NAMES[ball.targetHoop.shooter.idx] || '球員';
           if (playerStreak >= 3) {
-            addFloat('🔥 三連進！', hoop.x, hoop.y-36, '#ff6600', 26);
-            SFX.fire(); addCrowdEnergy(30); triggerShake(8);
+            addFloat('🔥 三連進！', hoop.x, hoop.y-36, '#ff6600', 28);
+            SFX.fire(); addCrowdEnergy(35); triggerShake(9);
+            const c=COMMENT_FIRE[Math.floor(Math.random()*COMMENT_FIRE.length)];
+            setTimeout(()=>showMsg(`${pName} — ${c}`,'#ff6600'),400);
           } else if (playerStreak === 2) {
-            addFloat('連進！', hoop.x, hoop.y-30, '#ffe040', 20);
-            addCrowdEnergy(15);
+            addFloat('連進！', hoop.x, hoop.y-30, '#ffe040', 22);
+            addCrowdEnergy(18);
+            setTimeout(()=>showMsg(`${pName} 連進！`,'#ffe040'),300);
+          } else {
+            const c=COMMENT_GOOD[Math.floor(Math.random()*COMMENT_GOOD.length)];
+            setTimeout(()=>showMsg(`${pName}：${c}`,'#f4a020'),300);
           }
-          showMsg(playerStreak>=2 ? `🔥 ${playerStreak}連進！` : '✅ 得分！', '#f4a020');
+          showMsg('✅ 得分！', '#f4a020');
         } else {
           eScore++;
           playerStreak = 0; onFire = false;
@@ -813,7 +835,18 @@ function updateBall(dt) {
           addCrowdEnergy(8);
         }
         updateScoreUI();
-        if (pScore>=goalScore || eScore>=goalScore) { endGame(); return; }
+        // ── 加時賽判定 ──
+        if (pScore>=goalScore && eScore>=goalScore) {
+          overtime=true;
+          showMsg('⚡ 加時賽！先得1分獲勝！','#ffe000');
+          SFX.fire(); triggerShake(8);
+          addFloat('加時！', CW/2, CH/2, '#ffe000', 36);
+          resetAfterScore(team); return;
+        }
+        if (pScore>=goalScore || eScore>=goalScore) {
+          if (overtime) { endGame(); return; } // 加時有人得分→結束
+          endGame(); return;
+        }
         resetAfterScore(team);
       } else {
         // 紫色技能判定
@@ -838,11 +871,26 @@ function updateBall(dt) {
           showMsg('🟣 自動搶板！球回到我方！','#c050ff');
           consumeSkill('p');
         } else {
+          // 🍀 幸運球：5% 機率打鐵變進
+          if (Math.random() < 0.05 && ball.targetHoop.shooter.team==='player') {
+            pScore++;
+            updateScoreUI();
+            SFX.score(); triggerShake(6); addCrowdEnergy(35);
+            addFloat('🍀 幸運球！', ball.targetHoop.x, ball.targetHoop.y, '#ffe000', 28);
+            showMsg('🍀 幸運！打鐵進！','#ffe000');
+            if (pScore>=goalScore) { endGame(); return; }
+            resetAfterScore('player'); return;
+          }
           ballFree=true; ballHolder=null;
           ball.vx=(Math.random()-0.5)*3.5; ball.vy=(Math.random()-0.5)*3.5;
           SFX.miss();
           addFloat('沒進', ball.x, ball.y, '#aaa', 16);
-          showMsg('籃板！','#8cf');
+          if (ball.targetHoop.shooter.team==='player') {
+            const c=COMMENT_MISS[Math.floor(Math.random()*COMMENT_MISS.length)];
+            showMsg(c,'#aaa');
+          } else {
+            showMsg('籃板！','#8cf');
+          }
         }
       }
     }
@@ -1284,9 +1332,10 @@ function doSteal() {
     const chance = 0.65 - (d / 42) * 0.18;
     if (Math.random() < chance) {
       dropBall();
-      SFX.steal(); triggerShake(4); addCrowdEnergy(18);
+      SFX.steal(); triggerShake(4); addCrowdEnergy(22);
       addFloat('🔥 搶斷！', me.x, me.y, '#4ef', 22);
-      showMsg('🔥 搶斷成功！', '#4ef');
+      const sc=COMMENT_STEAL[Math.floor(Math.random()*COMMENT_STEAL.length)];
+      showMsg(`🔥 搶斷！${sc}`, '#4ef');
     } else {
       showMsg('搶斷失敗', '#888');
     }
@@ -1342,10 +1391,8 @@ function onKeyDown(e) {
   // L — steal
   if (k==='l') doSteal();
 
-  // 1/2/3 — skills
-  if (k==='1') activateSkill('y');
-  if (k==='2') activateSkill('g');
-  if (k==='3') activateSkill('p');
+  // 1 — 啟動本局選定技能（不管是哪個）
+  if (k==='1') activateSkill(chosenSkill);
 }
 
 function onKeyUp(e) {
@@ -1437,8 +1484,21 @@ function showMsg(text,color='#f4a020') {
 // ═══════════════════════════════════════════════════════
 function endGame() {
   gameRunning=false; cancelAnimationFrame(animId);
-  MUSIC.stop();
-  SFX.buzzer();
+  MUSIC.stop(); SFX.buzzer();
+  if (pScore > eScore) {
+    spawnConfetti();
+    // 繼續繪製彩帶
+    let confettiFrames=0;
+    function drawWin() {
+      if (confettiParts.length===0 || confettiFrames>180) return;
+      updateConfetti(1/60); confettiFrames++;
+      ctx.save(); ctx.translate(shakeX,shakeY);
+      drawCourt(); drawPlayers(); drawBall(); drawConfetti();
+      ctx.restore();
+      requestAnimationFrame(drawWin);
+    }
+    requestAnimationFrame(drawWin);
+  }
   const won   = pScore>=goalScore;
   const title = won ? '🏆 你贏了！' : '😤 對手獲勝';
   const color = won ? '#f4a020' : '#e44';
@@ -1498,6 +1558,8 @@ function loop(ts) {
   updateCrowd(dt);
   checkPickup();
 
+  updateConfetti(dt);
+
   ctx.save();
   ctx.translate(shakeX, shakeY);
   ctx.clearRect(-10,-10,CW+20,CH+20);
@@ -1510,7 +1572,9 @@ function loop(ts) {
   drawOnFireEffect();
   drawShotClockWarning();
   drawCrowdBar();
+  drawComeback();
   drawEnemySkillHUD();
+  drawConfetti();
   ctx.restore();
 
   animId=requestAnimationFrame(loop);
@@ -1534,6 +1598,7 @@ function startGame() {
   chargingShot=false; shootPow=0; stealCdPlayer=0; lastTouchTeam='player';
   floatingTexts=[]; ballTrail=[]; screenShake=0; shakeX=0; shakeY=0;
   playerStreak=0; crowdEnergy=0; onFire=false;
+  overtime=false; confettiParts=[];
   sprintTimer=0; slowTimer=0; eSprintTimer=0; eSlowTimer=0;
   frozenTimers=[0,0,0]; pFrozenTimers=[0,0,0];
   ['y','g','p'].forEach(id=>{ skills[id].active=false; skills[id].cd=0; });
@@ -1661,6 +1726,48 @@ function addCrowdEnergy(v) {
 function updateCrowd(dt) {
   crowdEnergy = Math.max(0, crowdEnergy - dt*4);
   onFire = (playerStreak >= 2);
+}
+
+// ── 彩帶系統 ─────────────────────────────────────────
+const CONFETTI_COLS=['#f4a020','#4ef','#ffe000','#ff6060','#a0ff80','#c080ff','#fff'];
+function spawnConfetti() {
+  for(let i=0;i<80;i++) {
+    confettiParts.push({
+      x: Math.random()*CW, y: -10,
+      vx: (Math.random()-0.5)*5, vy: 2+Math.random()*4,
+      rot: Math.random()*360, rotV: (Math.random()-0.5)*8,
+      w: 6+Math.random()*8, h: 4+Math.random()*5,
+      col: CONFETTI_COLS[Math.floor(Math.random()*CONFETTI_COLS.length)],
+      life: 1
+    });
+  }
+}
+function updateConfetti(dt) {
+  confettiParts.forEach(c=>{ c.x+=c.vx; c.y+=c.vy; c.vy+=0.1; c.rot+=c.rotV; c.life-=dt*0.3; });
+  confettiParts=confettiParts.filter(c=>c.life>0&&c.y<CH+20);
+}
+function drawConfetti() {
+  confettiParts.forEach(c=>{
+    ctx.save();
+    ctx.globalAlpha=Math.min(1,c.life*2);
+    ctx.translate(c.x,c.y); ctx.rotate(c.rot*Math.PI/180);
+    ctx.fillStyle=c.col;
+    ctx.fillRect(-c.w/2,-c.h/2,c.w,c.h);
+    ctx.restore();
+  });
+}
+
+// ── 落後提示 ─────────────────────────────────────────
+function drawComeback() {
+  if (!gameRunning) return;
+  const diff = eScore - pScore;
+  if (diff < 2) return;
+  ctx.save();
+  ctx.globalAlpha = 0.55 + Math.sin(Date.now()/300)*0.2;
+  ctx.font='bold 13px Arial'; ctx.fillStyle='#ff8080';
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText(`落後 ${diff} 分　逆轉！`, 12, 12);
+  ctx.restore();
 }
 
 function drawCrowdBar() {
