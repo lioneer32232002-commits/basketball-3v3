@@ -187,24 +187,12 @@ canvas {
 
 <!-- Skills Bar -->
 <div id="skills-bar">
-  <div class="skill-slot cooling" id="skill-y">
-    <span class="sk-key">1</span>
-    <span class="sk-icon">🟡</span>
-    <span class="sk-label">必進三分</span>
-    <div class="sk-cd" id="sk-cd-y"></div>
-  </div>
-  <div class="skill-slot cooling" id="skill-g">
-    <span class="sk-key">2</span>
-    <span class="sk-icon">🟢</span>
-    <span class="sk-label">必進兩分</span>
-    <div class="sk-cd" id="sk-cd-g"></div>
-  </div>
-  <div class="skill-slot cooling" id="skill-p">
-    <span class="sk-key">3</span>
-    <span class="sk-icon">🟣</span>
-    <span class="sk-label">自動搶板</span>
-    <div class="sk-cd" id="sk-cd-p"></div>
-  </div>
+  <div class="skill-slot cooling" id="skill-y" ><span class="sk-key">1</span><span class="sk-icon">🟡</span><span class="sk-label">必進三分</span><div class="sk-cd" id="sk-cd-y"></div></div>
+  <div class="skill-slot cooling" id="skill-g" ><span class="sk-key">1</span><span class="sk-icon">🟢</span><span class="sk-label">必進兩分</span><div class="sk-cd" id="sk-cd-g"></div></div>
+  <div class="skill-slot cooling" id="skill-p" ><span class="sk-key">1</span><span class="sk-icon">🟣</span><span class="sk-label">自動搶板</span><div class="sk-cd" id="sk-cd-p"></div></div>
+  <div class="skill-slot cooling" id="skill-lt"><span class="sk-key">1</span><span class="sk-icon">⚡</span><span class="sk-label">閃電突破</span><div class="sk-cd" id="sk-cd-lt"></div></div>
+  <div class="skill-slot cooling" id="skill-ic"><span class="sk-key">1</span><span class="sk-icon">❄️</span><span class="sk-label">冰　　凍</span><div class="sk-cd" id="sk-cd-ic"></div></div>
+  <div class="skill-slot cooling" id="skill-sl"><span class="sk-key">1</span><span class="sk-icon">🌀</span><span class="sk-label">慢動作</span><div class="sk-cd" id="sk-cd-sl"></div></div>
 </div>
 
 <div id="pw-wrap"><div id="pw-label">投籃力道</div><div id="pw-bg"><div id="pw-fill"></div></div></div>
@@ -226,10 +214,13 @@ canvas {
   </div>
   <div class="row-opts" style="flex-direction:column;align-items:center;gap:8px;margin-bottom:4px;">
     <span style="font-size:14px;color:#ccc;letter-spacing:1px;">選擇本局技能（只能選一個）</span>
-    <div style="display:flex;gap:12px;">
-      <button class="skill-pick active" data-sk="y" style="background:rgba(255,224,0,0.15);border:2px solid #ffe000;color:#ffe000;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-family:inherit;">🟡 三分必進</button>
-      <button class="skill-pick" data-sk="g" style="background:rgba(0,255,96,0.08);border:2px solid #444;color:#888;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-family:inherit;">🟢 兩分必進</button>
-      <button class="skill-pick" data-sk="p" style="background:rgba(160,32,240,0.08);border:2px solid #444;color:#888;padding:10px 16px;border-radius:10px;cursor:pointer;font-size:13px;font-family:inherit;">🟣 自動搶板</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:500px;">
+      <button class="skill-pick active" data-sk="y"  style="background:rgba(255,224,0,0.15);border:2px solid #ffe000;color:#ffe000;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">🟡 三分必進</button>
+      <button class="skill-pick"        data-sk="g"  style="border:2px solid #444;color:#888;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">🟢 兩分必進</button>
+      <button class="skill-pick"        data-sk="p"  style="border:2px solid #444;color:#888;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">🟣 自動搶板</button>
+      <button class="skill-pick"        data-sk="lt" style="border:2px solid #444;color:#888;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">⚡ 閃電突破</button>
+      <button class="skill-pick"        data-sk="ic" style="border:2px solid #444;color:#888;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">❄️ 冰凍</button>
+      <button class="skill-pick"        data-sk="sl" style="border:2px solid #444;color:#888;padding:8px 12px;border-radius:10px;cursor:pointer;font-size:12px;font-family:inherit;">🌀 慢動作</button>
     </div>
   </div>
   <button class="menu-btn" id="start-btn">開始遊戲</button>
@@ -405,10 +396,21 @@ function shotAcc(d, team, shooterObj=null) {
 }
 
 function moveToward(p, t, spd) {
+  // 冰凍中不能動
+  if (p.team==='enemy') {
+    const fi = p.idx;
+    if (frozenTimers[fi] > 0) return;
+  }
+  if (p.team==='player') {
+    if (pFrozenTimers[p.idx] > 0) return;
+  }
+  const slowMul   = (p.team==='enemy' && slowTimer  > 0) ? 0.38 : 1;
+  const sprintMul = (p.team==='enemy' && eSprintTimer>0) ? 1.8  : 1;
   const dx=t.x-p.x, dy=t.y-p.y, d=Math.hypot(dx,dy);
   if (d<1) return;
-  p.x = clamp(p.x+(dx/d)*spd, 20, CW-20);
-  p.y = clamp(p.y+(dy/d)*spd, 20, CH-20);
+  const finalSpd = spd * slowMul * sprintMul * (p.spdMul||1);
+  p.x = clamp(p.x+(dx/d)*finalSpd, 20, CW-20);
+  p.y = clamp(p.y+(dy/d)*finalSpd, 20, CH-20);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -489,6 +491,36 @@ function drawPlayers() {
     if (isCtrl) {
       ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+4,0,Math.PI*2);
       ctx.strokeStyle='#ffe040'; ctx.lineWidth=2.5; ctx.stroke();
+    }
+
+    // ❄️ 冰凍效果
+    const frozenP = p.team==='enemy' ? frozenTimers[p.idx]  : pFrozenTimers[p.idx];
+    if (frozenP > 0) {
+      ctx.save(); ctx.globalAlpha=0.55+Math.sin(Date.now()/80)*0.25;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+6,0,Math.PI*2);
+      ctx.fillStyle='rgba(100,200,255,0.4)'; ctx.fill();
+      ctx.strokeStyle='#80eeff'; ctx.lineWidth=2; ctx.stroke();
+      ctx.font='16px Arial'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillStyle='#80eeff'; ctx.fillText('❄️', p.x, p.y-p.radius-2);
+      ctx.restore();
+    }
+
+    // ⚡ 閃電衝刺效果（我方）
+    if (p.team==='player' && isCtrl && sprintTimer>0) {
+      ctx.save(); ctx.globalAlpha=0.4+Math.sin(Date.now()/60)*0.3;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+8,0,Math.PI*2);
+      ctx.strokeStyle='#ffe040'; ctx.lineWidth=3; ctx.stroke();
+      ctx.font='14px Arial'; ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText('⚡', p.x, p.y-p.radius-3);
+      ctx.restore();
+    }
+
+    // 🌀 慢動作效果（顯示在敵方身上）
+    if (p.team==='enemy' && slowTimer>0) {
+      ctx.save(); ctx.globalAlpha=0.35;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.radius+5,0,Math.PI*2);
+      ctx.fillStyle='rgba(100,150,255,0.4)'; ctx.fill();
+      ctx.restore();
     }
 
     // Number
@@ -794,15 +826,18 @@ function updatePlayerMovement() {
   if (keys['s']||keys['arrowdown'])  dy+=1;
   if (keys['a']||keys['arrowleft'])  dx-=1;
   if (keys['d']||keys['arrowright']) dx+=1;
+  // 玩家被冰凍時無法移動
+  if (pFrozenTimers[ctrlIdx] > 0) { dx=0; dy=0; }
   if (dx||dy) {
     const len=Math.hypot(dx,dy);
-    const spd = 3.0 * (p.spdMul||1) * (1 - (p.fatigue||0)*0.2);
+    const sprintBoost = sprintTimer > 0 ? 1.9 : 1;
+    const slowPenalty = eSlowTimer  > 0 ? 0.45 : 1;
+    const spd = 3.0 * (p.spdMul||1) * (1-(p.fatigue||0)*0.2) * sprintBoost * slowPenalty;
     p.x=clamp(p.x+(dx/len)*spd, 20, CW-20);
     p.y=clamp(p.y+(dy/len)*spd, 20, CH-20);
     p.distRun = (p.distRun||0) + spd;
     p.fatigue = Math.min(1, (p.distRun||0) / 8000);
   } else {
-    // 站著休息，疲勞慢慢恢復
     p.fatigue = Math.max(0, (p.fatigue||0) - 0.001);
   }
 }
@@ -920,11 +955,33 @@ function updateEnemyAI(dt) {
     const three = is3pt(p.x, p.y, 'enemy');
     const useChance = { easy:0.15, medium:0.30, hard:0.55 }[difficulty];
     if (Math.random() < useChance) {
-      if (enemyChosenSkill === 'y' && three && d < cfg.shootDist + 50)  enemySkill.active = true;
-      if (enemyChosenSkill === 'g' && !three && d < cfg.shootDist)      enemySkill.active = true;
-      if (enemyChosenSkill === 'p' && ballHolder && ballHolder.team==='player') enemySkill.active = true;
+      if (enemyChosenSkill === 'y'  && three  && d < cfg.shootDist+50)  enemySkill.active = true;
+      if (enemyChosenSkill === 'g'  && !three && d < cfg.shootDist)     enemySkill.active = true;
+      if (enemyChosenSkill === 'p'  && ballHolder?.team==='player')      enemySkill.active = true;
+      if (enemyChosenSkill === 'lt' && carrier>=0) {
+        eSprintTimer = 4.5;
+        enemySkill.cd = SKILL_MAX_CD.lt;
+        showMsg('對手⚡衝刺！','#e44');
+        addFloat('⚡', players[3+carrier].x, players[3+carrier].y, '#ffe040', 28);
+        SFX.skill();
+      }
+      if (enemyChosenSkill === 'ic' && ballHolder?.team==='player') {
+        // 冰凍我方持球者
+        const fi = ballHolder.idx;
+        pFrozenTimers[fi] = 3;
+        enemySkill.cd = SKILL_MAX_CD.ic;
+        showMsg('對手❄️冰凍我方！','#e44');
+        addFloat('❄️', players[fi].x, players[fi].y, '#80eeff', 28);
+        SFX.oob();
+      }
+      if (enemyChosenSkill === 'sl' && ballHolder?.team==='player') {
+        eSlowTimer = 4;
+        enemySkill.cd = SKILL_MAX_CD.sl;
+        showMsg('對手🌀讓我方減速！','#e44');
+        SFX.skill();
+      }
     }
-    eSkillUseTimer = 3.0;
+    eSkillUseTimer = 3.5;
   }
 
   for (let i=0;i<3;i++) {
@@ -982,32 +1039,74 @@ function updateEnemyAI(dt) {
 // ═══════════════════════════════════════════════════════
 // SKILLS
 // ═══════════════════════════════════════════════════════
-const SKILL_MAX_CD = { y:18, g:18, p:22 };
+const SKILL_MAX_CD = { y:18, g:18, p:22, lt:20, ic:22, sl:25 };
 const skills = {
-  y: { active:false, cd:0 }, // 黃：三分必進
-  g: { active:false, cd:0 }, // 綠：兩分必進
-  p: { active:false, cd:0 }, // 紫：對方未進自動搶板
+  y:  { active:false, cd:0 }, // 🟡 黃：三分必進
+  g:  { active:false, cd:0 }, // 🟢 綠：兩分必進
+  p:  { active:false, cd:0 }, // 🟣 紫：對方未進自動搶板
+  lt: { active:false, cd:0 }, // ⚡ 閃電：衝刺+免疫搶斷 5s
+  ic: { active:false, cd:0 }, // ❄️ 冰凍：凍結最近敵人 3s
+  sl: { active:false, cd:0 }, // 🌀 慢動作：敵人全部減速 4s
 };
-let chosenSkill = 'y'; // 本局玩家選擇的技能
+let chosenSkill = 'y';
+
+// ── 技能效果計時器 ──────────────────────────────────────
+let sprintTimer   = 0;          // 閃電衝刺剩餘秒
+let slowTimer     = 0;          // 慢動作剩餘秒
+let frozenTimers  = [0, 0, 0];  // 每個敵人的冰凍剩餘秒
+// 對手技能效果
+let eSprintTimer  = 0;
+let eSlowTimer    = 0;
+let pFrozenTimers = [0, 0, 0];  // 每個我方球員冰凍
 
 // ── 對手技能 ──────────────────────────────────────────
-const SKILL_KEYS = ['y','g','p'];
-let enemyChosenSkill = 'y'; // 對手本局技能（開局隨機）
+const SKILL_KEYS = ['y','g','p','lt','ic','sl'];
+let enemyChosenSkill = 'y';
 const enemySkill = { active:false, cd:0 };
-let eSkillUseTimer = 0; // AI 使用技能的決策計時
+let eSkillUseTimer = 0;
+
+const SKILL_INFO = {
+  y:  { name:'🟡 三分必進！',  col:'#ffe000' },
+  g:  { name:'🟢 兩分必進！',  col:'#00ff60' },
+  p:  { name:'🟣 自動搶板！',  col:'#c050ff' },
+  lt: { name:'⚡ 閃電突破！',  col:'#ffe040' },
+  ic: { name:'❄️ 冰凍！',     col:'#80eeff' },
+  sl: { name:'🌀 慢動作！',   col:'#a0cfff' },
+};
 
 function activateSkill(id) {
-  if (id !== chosenSkill) return; // 本局只能用選定的技能
+  if (id !== chosenSkill) return;
   const sk = skills[id];
   if (sk.cd > 0)  { showMsg('技能冷卻中…', '#888'); return; }
-  if (sk.active)  { showMsg('技能已啟動！', '#888'); return; }
-  const names = { y:'🟡 三分必進！', g:'🟢 兩分必進！', p:'🟣 自動搶板！' };
-  const cols  = { y:'#ffe000', g:'#00ff60', p:'#c050ff' };
-  sk.active = true;
-  SFX.skill();
-  addFloat(names[id], players[ctrlIdx].x, players[ctrlIdx].y, cols[id], 20);
-  showMsg(names[id], cols[id]);
-  updateSkillUI();
+  if (sk.active && id!=='lt' && id!=='sl') { showMsg('技能已啟動！', '#888'); return; }
+
+  const { name, col } = SKILL_INFO[id];
+  SFX.skill(); triggerShake(3); addCrowdEnergy(15);
+  addFloat(name, players[ctrlIdx].x, players[ctrlIdx].y, col, 20);
+  showMsg(name, col);
+
+  if (id === 'lt') {
+    // ⚡ 閃電突破：衝刺 5 秒
+    sprintTimer = 5;
+    consumeSkill('lt');
+  } else if (id === 'ic') {
+    // ❄️ 冰凍：找最近的敵方球員
+    const me = players[ctrlIdx];
+    let nearI=0, nearD=9999;
+    for (let i=0;i<3;i++) { const d=dist(me,players[3+i]); if(d<nearD){nearD=d;nearI=i;} }
+    frozenTimers[nearI] = 3.5;
+    addFloat('❄️', players[3+nearI].x, players[3+nearI].y-20, '#80eeff', 28);
+    SFX.oob();
+    consumeSkill('ic');
+  } else if (id === 'sl') {
+    // 🌀 慢動作：敵人減速 4 秒
+    slowTimer = 4;
+    consumeSkill('sl');
+  } else {
+    // y / g / p 啟動後等投籃觸發
+    sk.active = true;
+    updateSkillUI();
+  }
 }
 
 function consumeSkill(id) {
@@ -1017,20 +1116,21 @@ function consumeSkill(id) {
 }
 
 function updateSkillUI() {
-  ['y','g','p'].forEach(id => {
+  Object.keys(skills).forEach(id => {
     const slot = document.getElementById('skill-'+id);
-    const cov  = document.getElementById('sk-cd-'+id);
-    const sk   = skills[id];
-    // 只顯示本局選定的技能
+    if (!slot) return;
+    const cov = document.getElementById('sk-cd-'+id);
+    const sk  = skills[id];
     slot.style.display = (id === chosenSkill) ? 'flex' : 'none';
     slot.classList.remove('ready','active','cooling');
-    if (sk.active) {
+    // 效果計時器對應 active 狀態
+    const timerActive = (id==='lt' && sprintTimer>0) || (id==='sl' && slowTimer>0);
+    if (sk.active || timerActive) {
       slot.classList.add('active');
       cov.style.setProperty('--pct','0deg');
     } else if (sk.cd > 0) {
       slot.classList.add('cooling');
-      const pct = (sk.cd / SKILL_MAX_CD[id]) * 360;
-      cov.style.setProperty('--pct', pct+'deg');
+      cov.style.setProperty('--pct', (sk.cd/SKILL_MAX_CD[id]*360)+'deg');
     } else {
       slot.classList.add('ready');
       cov.style.setProperty('--pct','0deg');
@@ -1040,13 +1140,19 @@ function updateSkillUI() {
 
 function updateSkillCooldowns(dt) {
   let changed = false;
-  ['y','g','p'].forEach(id => {
-    if (skills[id].cd > 0) {
-      skills[id].cd = Math.max(0, skills[id].cd - dt);
-      changed = true;
-    }
+  Object.keys(skills).forEach(id => {
+    if (skills[id].cd > 0) { skills[id].cd = Math.max(0, skills[id].cd - dt); changed=true; }
   });
   if (changed) updateSkillUI();
+  // 效果計時器
+  if (sprintTimer  > 0) sprintTimer  = Math.max(0, sprintTimer  - dt);
+  if (slowTimer    > 0) slowTimer    = Math.max(0, slowTimer    - dt);
+  if (eSprintTimer > 0) eSprintTimer = Math.max(0, eSprintTimer - dt);
+  if (eSlowTimer   > 0) eSlowTimer   = Math.max(0, eSlowTimer   - dt);
+  for (let i=0;i<3;i++) {
+    if (frozenTimers[i]  > 0) frozenTimers[i]  = Math.max(0, frozenTimers[i]  - dt);
+    if (pFrozenTimers[i] > 0) pFrozenTimers[i] = Math.max(0, pFrozenTimers[i] - dt);
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1064,7 +1170,9 @@ function doSteal() {
     const d = dist(me, bh);
     if (d > 42) { showMsg('距離太遠', '#888'); stealCdPlayer=0.5; return; }
 
-    // 關鍵：對手必須在移動中才能搶斷
+    // 對手閃電衝刺中無法被搶斷
+    if (eSprintTimer > 0) { showMsg('對手加速中，搶不了！','#888'); stealCdPlayer=0.5; return; }
+    // 對手必須在移動中才能搶斷
     const isMoving = bh.moveSpd > 0.8;
     if (!isMoving) {
       showMsg('對手站著，搶不了！', '#888');
@@ -1313,6 +1421,8 @@ function startGame() {
   chargingShot=false; shootPow=0; stealCdPlayer=0; lastTouchTeam='player';
   floatingTexts=[]; ballTrail=[]; screenShake=0; shakeX=0; shakeY=0;
   playerStreak=0; crowdEnergy=0; onFire=false;
+  sprintTimer=0; slowTimer=0; eSprintTimer=0; eSlowTimer=0;
+  frozenTimers=[0,0,0]; pFrozenTimers=[0,0,0];
   ['y','g','p'].forEach(id=>{ skills[id].active=false; skills[id].cd=0; });
   // 對手隨機選技能
   enemyChosenSkill = SKILL_KEYS[Math.floor(Math.random() * 3)];
@@ -1349,8 +1459,8 @@ function bindOverlay() {
     });
   });
   // 技能選擇
-  const skColors = { y:'#ffe000', g:'#00ff60', p:'#c050ff' };
-  const skBg     = { y:'rgba(255,224,0,0.15)', g:'rgba(0,255,96,0.08)', p:'rgba(160,32,240,0.15)' };
+  const skColors = { y:'#ffe000', g:'#00ff60', p:'#c050ff', lt:'#ffe040', ic:'#80eeff', sl:'#a0cfff' };
+  const skBg     = { y:'rgba(255,224,0,0.15)', g:'rgba(0,255,96,0.08)', p:'rgba(160,32,240,0.15)', lt:'rgba(255,224,0,0.15)', ic:'rgba(100,200,255,0.15)', sl:'rgba(100,150,255,0.15)' };
   document.querySelectorAll('[data-sk]').forEach(b=>{
     b.addEventListener('click',()=>{
       chosenSkill = b.dataset.sk;
