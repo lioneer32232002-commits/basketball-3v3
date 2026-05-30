@@ -180,6 +180,7 @@ canvas {
     <button class="diff-btn active" data-diff="easy">簡單</button>
     <button class="diff-btn" data-diff="medium">中度</button>
     <button class="diff-btn" data-diff="hard">困難</button>
+    <button class="diff-btn" id="music-btn" style="margin-left:8px" onclick="toggleMusic()">🎸 音樂</button>
   </div>
 </div>
 
@@ -264,6 +265,106 @@ const SFX = {
   crowd:  () => { playNoise(0.4, 0.08); },
   dribble:() => { playTone(120,'sine',0.05,0.15); },
 };
+
+// ═══════════════════════════════════════════════════════
+// ROCK MUSIC ENGINE
+// ═══════════════════════════════════════════════════════
+const MUSIC = (() => {
+  let playing=false, nextTime=0, step=0, masterVol=0.55;
+  const BPM=136, STEP_DUR=60/BPM/2;
+
+  // 和弦進行：Am - F - C - G（兩小節16步）
+  const ROOTS=[110,110,110,110, 87.3,87.3,87.3,87.3, 65.4,65.4,65.4,65.4, 98,98,98,98];
+  const KICK =[1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0];
+  const SNARE=[0,0,0,0,1,0,0,0, 0,0,0,0,1,0,0,0];
+  const HAT  =[1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1];
+  const BASS =[1,0,0,1,0,0,1,0, 1,0,0,1,0,0,1,0];
+  const CHORD=[1,0,0,0,1,0,0,0, 1,0,0,0,1,0,0,0];
+  // 偶爾的和弦打擊
+  const STAB =[0,0,0,0,0,0,1,0, 0,0,0,0,0,0,1,1];
+
+  function dc(amt=80) {
+    const c=new Float32Array(512);
+    for(let i=0;i<512;i++){const x=i*2/512-1; c[i]=(Math.PI+amt)*x/(Math.PI+amt*Math.abs(x));}
+    return c;
+  }
+
+  function kick(t) {
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.connect(g);g.connect(AC.destination);
+    o.type='sine'; o.frequency.setValueAtTime(220,t); o.frequency.exponentialRampToValueAtTime(38,t+0.13);
+    g.gain.setValueAtTime(masterVol*1.8,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.2);
+    o.start(t); o.stop(t+0.22);
+  }
+
+  function snare(t) {
+    const len=Math.floor(AC.sampleRate*0.14), buf=AC.createBuffer(1,len,AC.sampleRate);
+    const d=buf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=AC.createBufferSource(), flt=AC.createBiquadFilter(), g=AC.createGain();
+    flt.type='highpass'; flt.frequency.value=900;
+    src.buffer=buf; src.connect(flt); flt.connect(g); g.connect(AC.destination);
+    g.gain.setValueAtTime(masterVol*1.0,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.13);
+    src.start(t); src.stop(t+0.16);
+    // body thud
+    const o2=AC.createOscillator(),g2=AC.createGain();
+    o2.connect(g2);g2.connect(AC.destination);
+    o2.type='triangle'; o2.frequency.value=240;
+    g2.gain.setValueAtTime(masterVol*0.6,t); g2.gain.exponentialRampToValueAtTime(0.001,t+0.07);
+    o2.start(t); o2.stop(t+0.09);
+  }
+
+  function hat(t, vol=0.22) {
+    const len=Math.floor(AC.sampleRate*0.04), buf=AC.createBuffer(1,len,AC.sampleRate);
+    const d=buf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
+    const src=AC.createBufferSource(),flt=AC.createBiquadFilter(),g=AC.createGain();
+    flt.type='highpass'; flt.frequency.value=9000;
+    src.buffer=buf; src.connect(flt); flt.connect(g); g.connect(AC.destination);
+    g.gain.setValueAtTime(masterVol*vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.035);
+    src.start(t);
+  }
+
+  function guitar(root,t,dur=0.48) {
+    const freqs=[root, root*1.498, root*2, root*2.996]; // root, fifth, oct, 2nd oct 5th
+    freqs.forEach((f,idx) => {
+      const o=AC.createOscillator(), ws=AC.createWaveShaper(), g=AC.createGain();
+      ws.curve=dc(120); ws.oversample='2x';
+      o.type='sawtooth'; o.frequency.value=f;
+      o.connect(ws); ws.connect(g); g.connect(AC.destination);
+      const v=masterVol*(0.14-idx*0.025);
+      g.gain.setValueAtTime(v,t); g.gain.setValueAtTime(v*0.75,t+dur*0.6);
+      g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+      o.start(t); o.stop(t+dur+0.02);
+    });
+  }
+
+  function bassNote(root,t) {
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type='sawtooth'; o.frequency.value=root/2;
+    o.connect(g); g.connect(AC.destination);
+    g.gain.setValueAtTime(masterVol*0.5,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.23);
+    o.start(t); o.stop(t+0.26);
+  }
+
+  function sched() {
+    while (nextTime < AC.currentTime + 0.35) {
+      const s=step%16;
+      if(KICK[s])  kick(nextTime);
+      if(SNARE[s]) snare(nextTime);
+      if(HAT[s])   hat(nextTime, s%2===0?0.25:0.15);
+      if(CHORD[s]) guitar(ROOTS[s], nextTime);
+      if(STAB[s])  guitar(ROOTS[s], nextTime, 0.18);
+      if(BASS[s])  bassNote(ROOTS[s], nextTime);
+      nextTime += STEP_DUR; step++;
+    }
+    if(playing) setTimeout(sched, 80);
+  }
+
+  return {
+    start(){ if(playing) return; playing=true; nextTime=AC.currentTime+0.05; step=0; sched(); },
+    stop(){ playing=false; },
+    get isPlaying(){ return playing; }
+  };
+})();
 
 // ═══════════════════════════════════════════════════════
 // CONSTANTS
@@ -1172,15 +1273,15 @@ function doSteal() {
 
     // 對手閃電衝刺中無法被搶斷
     if (eSprintTimer > 0) { showMsg('對手加速中，搶不了！','#888'); stealCdPlayer=0.5; return; }
-    // 對手必須在移動中才能搶斷
-    const isMoving = bh.moveSpd > 0.8;
+    // 對手必須在走動中才能搶（門檻低一點，確保能搶）
+    const isMoving = bh.moveSpd > 0.12;
     if (!isMoving) {
-      showMsg('對手站著，搶不了！', '#888');
-      stealCdPlayer = 0.5;
+      showMsg('對手站著不動，搶不了！', '#888');
+      stealCdPlayer = 0.4;
       return;
     }
 
-    const chance = 0.60 - (d / 42) * 0.2;
+    const chance = 0.65 - (d / 42) * 0.18;
     if (Math.random() < chance) {
       dropBall();
       SFX.steal(); triggerShake(4); addCrowdEnergy(18);
@@ -1336,6 +1437,8 @@ function showMsg(text,color='#f4a020') {
 // ═══════════════════════════════════════════════════════
 function endGame() {
   gameRunning=false; cancelAnimationFrame(animId);
+  MUSIC.stop();
+  SFX.buzzer();
   const won   = pScore>=goalScore;
   const title = won ? '🏆 你贏了！' : '😤 對手獲勝';
   const color = won ? '#f4a020' : '#e44';
@@ -1413,6 +1516,16 @@ function loop(ts) {
   animId=requestAnimationFrame(loop);
 }
 
+// ─── Music toggle ────────────────────────────────────
+let musicEnabled = true;
+function toggleMusic() {
+  AC.resume(); // unlock AudioContext on first user gesture
+  if (MUSIC.isPlaying) { MUSIC.stop(); musicEnabled=false; }
+  else { MUSIC.start(); musicEnabled=true; }
+  const btn=document.getElementById('music-btn');
+  if(btn) { btn.textContent = musicEnabled ? '🎸 音樂' : '🔇 靜音'; btn.classList.toggle('active', musicEnabled); }
+}
+
 // ═══════════════════════════════════════════════════════
 // START
 // ═══════════════════════════════════════════════════════
@@ -1435,6 +1548,8 @@ function startGame() {
   updateScoreUI();
   document.getElementById('overlay').style.display='none';
   document.getElementById('skills-bar').style.display='flex';
+  // 開始播放搖滾音樂
+  AC.resume().then(()=>{ if(musicEnabled) MUSIC.start(); });
   gameRunning=true;
   lastTime=performance.now();
   animId=requestAnimationFrame(loop);
