@@ -183,6 +183,7 @@ let gameRunning  = false;
 let pScore = 0, eScore = 0;
 let shotClock    = 24;
 let lastTime     = 0, animId = null;
+let lastTouchTeam = 'player'; // track who last possessed ball (for OOB)
 
 // Ball
 let ball = { x:CW/2, y:CH/2, z:0, vx:0, vy:0, vz:0,
@@ -398,6 +399,7 @@ function drawPassArrow() {
 // SHOOTING
 // ═══════════════════════════════════════════════════════
 function shootBall(ref, pow) {
+  lastTouchTeam = ref.team;
   const sh   = getP(ref);
   const hoop = atkHoop(ref.team);
   const d    = dist(sh, hoop);
@@ -455,6 +457,13 @@ function updateBall(dt) {
   if (ball._passTarget) {
     ball.x+=ball.vx; ball.y+=ball.vy;
     ball.z=Math.max(0, ball.z+ball.vz); ball.vz-=0.4;
+
+    // Out of bounds during pass → other team gets ball
+    if (isOOB(ball.x, ball.y)) {
+      handleOOB(ball._passTarget.team);
+      return;
+    }
+
     const tIdx = ball._passTarget.team==='player' ? ball._passTarget.idx : ball._passTarget.idx+3;
     const tgt  = players[tIdx];
     if (tgt && dist(ball,tgt)<34) {
@@ -499,14 +508,13 @@ function updateBall(dt) {
     return;
   }
 
-  // Free ball bounce
+  // Free ball — out of bounds rule
   if (ballFree) {
     ball.x+=ball.vx; ball.y+=ball.vy;
     ball.vx*=0.96; ball.vy*=0.96;
-    if (ball.x<20)   { ball.x=20;    ball.vx*=-0.6; }
-    if (ball.x>CW-20){ ball.x=CW-20; ball.vx*=-0.6; }
-    if (ball.y<20)   { ball.y=20;    ball.vy*=-0.6; }
-    if (ball.y>CH-20){ ball.y=CH-20; ball.vy*=-0.6; }
+    if (isOOB(ball.x, ball.y)) {
+      handleOOB(lastTouchTeam);
+    }
   }
 }
 
@@ -516,6 +524,7 @@ function catchBall(ref) {
   ball._passTarget=null; ball.z=0;
   ball.vx=0; ball.vy=0;
   shotClock=24;
+  lastTouchTeam=ref.team;
   if (ref.team==='player') ctrlIdx=ref.idx;
 }
 
@@ -524,6 +533,28 @@ function dropBall() {
   ballFree=true; ballHolder=null; ballInAir=true;
   ball.vx=(Math.random()-0.5)*4; ball.vy=(Math.random()-0.5)*4;
   ball.vz=1; ball.z=0;
+}
+
+// ── Out of Bounds ──────────────────────────────────────
+const OOB_X1=8, OOB_X2=CW-8, OOB_Y1=8, OOB_Y2=CH-8;
+function isOOB(x, y) { return x<OOB_X1 || x>OOB_X2 || y<OOB_Y1 || y>OOB_Y2; }
+
+function handleOOB(foulTeam) {
+  // foulTeam = team that sent ball out; other team gets possession
+  const getTeam = foulTeam==='player' ? 'enemy' : 'player';
+  ball.x = clamp(ball.x, OOB_X1+20, OOB_X2-20);
+  ball.y = clamp(ball.y, OOB_Y1+20, OOB_Y2-20);
+  ball.vx=0; ball.vy=0; ball.vz=0; ball.z=0;
+  ball._passTarget=null; ball._flightLeft=0;
+  ballInAir=false; ballFree=false;
+  ballHolder={ team:getTeam, idx:0 };
+  shotClock=24;
+  lastTouchTeam=getTeam;
+  if (getTeam==='player') ctrlIdx=0;
+  showMsg(
+    getTeam==='player' ? '出界！我方拿球 🏀' : '出界！對方拿球',
+    getTeam==='player' ? '#4ef' : '#e44'
+  );
 }
 
 // ═══════════════════════════════════════════════════════
@@ -931,7 +962,7 @@ function loop(ts) {
 // ═══════════════════════════════════════════════════════
 function startGame() {
   pScore=0; eScore=0; shotClock=24;
-  chargingShot=false; shootPow=0; stealCdPlayer=0;
+  chargingShot=false; shootPow=0; stealCdPlayer=0; lastTouchTeam='player';
   ballInAir=false; ballFree=false;
   cfg=DIFF[difficulty];
   tmAiT=[0,0,0]; eAiT=0;
