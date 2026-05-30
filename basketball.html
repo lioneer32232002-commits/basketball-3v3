@@ -402,9 +402,27 @@ let playerStreak  = 0;
 let crowdEnergy   = 0;
 let onFire        = false;
 let shakeX = 0, shakeY = 0;
-let overtime      = false;     // 加時賽
-let confettiParts = [];        // 彩帶粒子
-let commentaryTimer = 0;       // 解說計時
+let overtime      = false;
+let confettiParts = [];
+let commentaryTimer = 0;
+// ── 道具系統 ─────────────────────────────────────────
+let powerUps       = [];
+let puSpawnTimer   = 10;
+let playerShield   = false;
+let playerDouble   = false;
+let playerSharpT   = 0;
+let playerSpeedT   = 0;
+// ── 連擊系統 ─────────────────────────────────────────
+let combo          = 0;
+let comboTimer     = 0;
+let comboMul       = 1;
+// ── 慢動作重播 ────────────────────────────────────────
+let slowMoTimer    = 0;
+// ── 嘲諷對白 ─────────────────────────────────────────
+let trashBubble    = null;
+const TRASH_TALK   = ['你的防守呢😂','太菜了吧','別追啦~','拿去！','追不上的！','哈哈哈','我太強了','GG了喔'];
+// ── MVP 統計 ──────────────────────────────────────────
+const mvpStats = { scores:0, steals:0, streak:0 };
 
 // 球員名字
 const PLAYER_NAMES = ['閃電⚡','神準🎯','飛毛腿🦵'];
@@ -508,6 +526,8 @@ function shotAcc(d, team, shooterObj=null) {
   if (team==='player' && (eScore - pScore) >= 2) base += Math.min(0.1, (eScore-pScore)*0.03);
   // 觀眾沸騰加成
   if (team==='player' && crowdEnergy >= 80) base += 0.05;
+  // 🎯 神準道具
+  if (team==='player' && playerSharpT>0) return 0.97;
   return clamp(base - Math.max(0,(d-100)/420), 0.08, 0.97);
 }
 
@@ -812,6 +832,12 @@ function updateBall(dt) {
           pScore++;
           playerStreak++;
           addFloat('+1', hoop.x, hoop.y, '#f4a020', 28);
+          // 雙倍分道具
+          const earnedPts = playerDouble ? 2 : 1;
+          if (playerDouble) { playerDouble=false; addFloat('💥 雙倍+2！',hoop.x,hoop.y,'\#ff80ff',26); }
+          pScore += earnedPts - 1; // will add 1 below normally
+          addCombo('score'); mvpStats.scores++;
+          if(crowdEnergy>=65) triggerSlowMo();
           const pName = PLAYER_NAMES[ball.targetHoop.shooter.idx] || '球員';
           if (playerStreak >= 3) {
             addFloat('🔥 三連進！', hoop.x, hoop.y-36, '#ff6600', 28);
@@ -829,10 +855,11 @@ function updateBall(dt) {
           showMsg('✅ 得分！', '#f4a020');
         } else {
           eScore++;
-          playerStreak = 0; onFire = false;
+          playerStreak=0; onFire=false; combo=0; comboMul=1; comboTimer=0;
           addFloat('+1', hoop.x, hoop.y, '#e44', 24);
           showMsg('對手得分！', '#e44');
           addCrowdEnergy(8);
+          maybeTrashTalk(hoop.x, hoop.y);
         }
         updateScoreUI();
         // ── 加時賽判定 ──
@@ -979,9 +1006,10 @@ function updatePlayerMovement() {
   if (pFrozenTimers[ctrlIdx] > 0) { dx=0; dy=0; }
   if (dx||dy) {
     const len=Math.hypot(dx,dy);
-    const sprintBoost = sprintTimer > 0 ? 1.9 : 1;
-    const slowPenalty = eSlowTimer  > 0 ? 0.45 : 1;
-    const spd = 3.0 * (p.spdMul||1) * (1-(p.fatigue||0)*0.2) * sprintBoost * slowPenalty;
+    const sprintBoost = sprintTimer  > 0 ? 1.9 : 1;
+    const puBoost     = playerSpeedT  > 0 ? 1.8 : 1;
+    const slowPenalty = eSlowTimer    > 0 ? 0.45 : 1;
+    const spd = 3.0 * (p.spdMul||1) * (1-(p.fatigue||0)*0.2) * sprintBoost * puBoost * slowPenalty;
     p.x=clamp(p.x+(dx/len)*spd, 20, CW-20);
     p.y=clamp(p.y+(dy/len)*spd, 20, CH-20);
     p.distRun = (p.distRun||0) + spd;
@@ -1173,8 +1201,15 @@ function updateEnemyAI(dt) {
           // Steal attempt
           if (bh && dist(p,bh)<30 && p.stealCd<=0) {
             if (Math.random()<cfg.stealChance*dt*2.5) {
-              dropBall();
-              showMsg('被搶球！','#e44');
+              if (playerShield) {
+                playerShield=false;
+                addFloat('🛡️ 護盾！',bh.x,bh.y,'#80cfff',24);
+                showMsg('🛡️ 護盾擋住了！','#80cfff');
+              } else {
+                dropBall();
+                combo=0; comboMul=1; comboTimer=0;
+                showMsg('被搶球！','#e44');
+              }
               p.stealCd=1.8;
             }
           }
@@ -1334,6 +1369,7 @@ function doSteal() {
       dropBall();
       SFX.steal(); triggerShake(4); addCrowdEnergy(22);
       addFloat('🔥 搶斷！', me.x, me.y, '#4ef', 22);
+      addCombo('steal'); mvpStats.steals++;
       const sc=COMMENT_STEAL[Math.floor(Math.random()*COMMENT_STEAL.length)];
       showMsg(`🔥 搶斷！${sc}`, '#4ef');
     } else {
@@ -1502,10 +1538,15 @@ function endGame() {
   const won   = pScore>=goalScore;
   const title = won ? '🏆 你贏了！' : '😤 對手獲勝';
   const color = won ? '#f4a020' : '#e44';
+  const mvpName = PLAYER_NAMES[0]; // simplified - could track per-player
+  const mvpLine = won
+    ? `<div style="font-size:13px;color:#ffe000;margin-bottom:12px">🏅 本局MVP：${mvpName} ｜ 得分 ${mvpStats.scores} ｜ 搶斷 ${mvpStats.steals} ｜ 最高連擊 ${mvpStats.streak}</div>`
+    : `<div style="font-size:13px;color:#aaa;margin-bottom:12px">📊 本局得分：${mvpStats.scores} ｜ 搶斷：${mvpStats.steals} ｜ 最高連擊：${mvpStats.streak}</div>`;
   const ov=document.getElementById('overlay');
   ov.innerHTML=`
     <h1 style="color:${color}">${title}</h1>
     <div class="big-score"><span class="s1">${pScore}</span> : <span class="s2">${eScore}</span></div>
+    ${mvpLine}
     <div class="row-opts">
       <span>目標：</span>
       <button class="diff-btn ${goalScore===5?'active':''}" data-goal="5">先得5分</button>
@@ -1535,8 +1576,10 @@ function endGame() {
 // ═══════════════════════════════════════════════════════
 function loop(ts) {
   if (!gameRunning) return;
-  const dt=Math.min((ts-lastTime)/1000, 0.05);
+  const rawDt=Math.min((ts-lastTime)/1000, 0.05);
   lastTime=ts;
+  if(slowMoTimer>0){ slowMoTimer=Math.max(0,slowMoTimer-rawDt); }
+  const dt = slowMoTimer>0 ? rawDt*0.22 : rawDt;
 
   updateShotClock(dt);
   updateShotClockUI();
@@ -1556,6 +1599,9 @@ function loop(ts) {
   updateBallTrail();
   updateShake();
   updateCrowd(dt);
+  updatePowerUps(dt);
+  updateCombo(dt);
+  updateTrashTalk(dt);
   checkPickup();
 
   updateConfetti(dt);
@@ -1566,13 +1612,17 @@ function loop(ts) {
   drawCourt();
   drawBallTrail();
   drawPassArrow();
+  drawZoneIndicator();
   drawPlayers();
   drawBall();
+  drawPowerUps();
   drawFloats();
+  drawComboMeter();
   drawOnFireEffect();
   drawShotClockWarning();
   drawCrowdBar();
   drawComeback();
+  drawTrashTalk();
   drawEnemySkillHUD();
   drawConfetti();
   ctx.restore();
@@ -1599,6 +1649,9 @@ function startGame() {
   floatingTexts=[]; ballTrail=[]; screenShake=0; shakeX=0; shakeY=0;
   playerStreak=0; crowdEnergy=0; onFire=false;
   overtime=false; confettiParts=[];
+  powerUps=[]; puSpawnTimer=10; playerShield=false; playerDouble=false; playerSharpT=0; playerSpeedT=0;
+  combo=0; comboTimer=0; comboMul=1; slowMoTimer=0; trashBubble=null;
+  mvpStats.scores=0; mvpStats.steals=0; mvpStats.streak=0;
   sprintTimer=0; slowTimer=0; eSprintTimer=0; eSlowTimer=0;
   frozenTimers=[0,0,0]; pFrozenTimers=[0,0,0];
   ['y','g','p'].forEach(id=>{ skills[id].active=false; skills[id].cd=0; });
@@ -1808,6 +1861,170 @@ function drawShotClockWarning() {
   ctx.lineWidth = 6;
   ctx.strokeRect(3, 3, CW-6, CH-6);
   ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+// POWER-UPS 道具系統
+// ═══════════════════════════════════════════════════════
+const PU_TYPES=[
+  {id:'speed', icon:'⚡',col:'#ffe000',desc:'速度x2，6秒'},
+  {id:'sharp', icon:'🎯',col:'#00ff88',desc:'8秒神準'},
+  {id:'shield',icon:'🛡️',col:'#80cfff',desc:'免搶斷一次'},
+  {id:'double',icon:'💥',col:'#ff80ff',desc:'下球得2分'},
+];
+
+function updatePowerUps(dt) {
+  puSpawnTimer-=dt;
+  if (puSpawnTimer<=0 && powerUps.length<2) {
+    const t=PU_TYPES[Math.floor(Math.random()*PU_TYPES.length)];
+    powerUps.push({...t, x:160+Math.random()*(CW-320), y:60+Math.random()*(CH-120), pulse:0});
+    puSpawnTimer=9+Math.random()*7;
+  }
+  powerUps.forEach(p=>p.pulse=(p.pulse||0)+dt*3.5);
+  const me=players[ctrlIdx];
+  powerUps=powerUps.filter(pu=>{
+    if(dist(me,pu)<22){ applyPU(pu); return false; }
+    return true;
+  });
+  if(playerSpeedT>0) playerSpeedT=Math.max(0,playerSpeedT-dt);
+  if(playerSharpT>0) playerSharpT=Math.max(0,playerSharpT-dt);
+}
+
+function applyPU(pu) {
+  SFX.skill(); triggerShake(3); addCrowdEnergy(18);
+  addFloat(pu.icon+' '+pu.desc, players[ctrlIdx].x, players[ctrlIdx].y-20, pu.col, 22);
+  showMsg(pu.icon+' '+pu.desc+'！', pu.col);
+  if(pu.id==='speed')  playerSpeedT=6;
+  if(pu.id==='sharp')  playerSharpT=8;
+  if(pu.id==='shield') { playerShield=true; addFloat('🛡️',players[ctrlIdx].x,players[ctrlIdx].y,pu.col,28); }
+  if(pu.id==='double') { playerDouble=true; addFloat('💥',players[ctrlIdx].x,players[ctrlIdx].y,pu.col,28); }
+}
+
+function drawPowerUps() {
+  powerUps.forEach(pu=>{
+    const pulse=Math.sin(pu.pulse)*3;
+    const r=17+pulse;
+    ctx.save();
+    ctx.shadowBlur=16; ctx.shadowColor=pu.col;
+    ctx.beginPath(); ctx.arc(pu.x,pu.y,r,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fill();
+    ctx.strokeStyle=pu.col; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.shadowBlur=0;
+    ctx.font='16px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(pu.icon,pu.x,pu.y);
+    ctx.font='9px Arial'; ctx.fillStyle=pu.col;
+    ctx.textBaseline='top';
+    ctx.fillText(pu.id==='shield'?'護盾':pu.id==='double'?'雙倍':pu.id==='speed'?'加速':'神準', pu.x, pu.y+r+3);
+    ctx.restore();
+  });
+  // 顯示當前道具狀態
+  let bx=10, by=CH-45;
+  const actives=[];
+  if(playerSpeedT>0)  actives.push({icon:'⚡',t:playerSpeedT});
+  if(playerSharpT>0)  actives.push({icon:'🎯',t:playerSharpT});
+  if(playerShield)    actives.push({icon:'🛡️',t:0});
+  if(playerDouble)    actives.push({icon:'💥',t:0});
+  actives.forEach(a=>{
+    ctx.fillStyle='rgba(0,0,0,0.65)';
+    ctx.fillRect(bx,by,44,28);
+    ctx.font='18px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(a.icon, bx+14, by+14);
+    if(a.t>0){ ctx.font='10px Arial'; ctx.fillStyle='#fff'; ctx.fillText(Math.ceil(a.t)+'s',bx+34,by+14); }
+    bx+=48;
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// COMBO METER 連擊計數
+// ═══════════════════════════════════════════════════════
+function addCombo(reason) {
+  combo++; comboTimer=4.5;
+  comboMul=1+Math.floor(combo/2)*0.5;
+  mvpStats.streak=Math.max(mvpStats.streak,combo);
+  if(combo>=4){ addFloat(`🔥x${comboMul.toFixed(1)} COMBO!`,CW/2,70,'#ff80ff',26); SFX.fire(); addCrowdEnergy(20); }
+}
+
+function updateCombo(dt) {
+  if(comboTimer>0){ comboTimer-=dt; if(comboTimer<=0){combo=0;comboMul=1;} }
+}
+
+function drawComboMeter() {
+  if(!gameRunning||combo<2) return;
+  const col=combo>=5?'#ff4040':combo>=3?'#ff80ff':'#ffe040';
+  ctx.save();
+  ctx.font=`bold ${14+Math.min(combo,6)}px Arial Black`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.strokeStyle='#000'; ctx.lineWidth=3;
+  ctx.strokeText(`🔥 ${combo}連擊 x${comboMul.toFixed(1)}`,CW/2,44);
+  ctx.fillStyle=col;
+  ctx.fillText(`🔥 ${combo}連擊 x${comboMul.toFixed(1)}`,CW/2,44);
+  // combo bar
+  const barW=Math.min(combo*18,180);
+  ctx.fillStyle=col; ctx.globalAlpha=0.4;
+  ctx.fillRect(CW/2-barW/2, 54, barW, 4);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+// ZONE INDICATOR 射程區域提示
+// ═══════════════════════════════════════════════════════
+function drawZoneIndicator() {
+  if(!gameRunning) return;
+  const p=players[ctrlIdx];
+  const hoop=atkHoop('player');
+  const d=dist(p,hoop);
+  const is3=d>195;
+  ctx.save();
+  ctx.globalAlpha=0.18+Math.sin(Date.now()/400)*0.06;
+  ctx.beginPath(); ctx.arc(p.x,p.y,15,0,Math.PI*2);
+  ctx.fillStyle=is3?'#00ff88':'#4488ff'; ctx.fill();
+  ctx.globalAlpha=0.85;
+  ctx.font='bold 11px Arial'; ctx.fillStyle=is3?'#00ff88':'#88aaff';
+  ctx.textAlign='center'; ctx.textBaseline='bottom';
+  ctx.fillText(is3?'3分🏀':'2分🏀', p.x, p.y-20);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+// TRASH TALK 嘲諷對白
+// ═══════════════════════════════════════════════════════
+function maybeTrashTalk(x,y) {
+  if(Math.random()>0.6) return;
+  const txt=TRASH_TALK[Math.floor(Math.random()*TRASH_TALK.length)];
+  trashBubble={text:txt, x, y:y-30, life:2.5};
+}
+
+function updateTrashTalk(dt) {
+  if(trashBubble){ trashBubble.life-=dt; if(trashBubble.life<=0)trashBubble=null; }
+}
+
+function drawTrashTalk() {
+  if(!trashBubble) return;
+  const{text,x,y,life}=trashBubble;
+  const a=Math.min(1,life*1.5);
+  ctx.save(); ctx.globalAlpha=a;
+  ctx.font='bold 13px Arial';
+  const tw=ctx.measureText(text).width+18;
+  const bx=clamp(x-tw/2,5,CW-tw-5);
+  const by=clamp(y-20,5,CH-35);
+  ctx.fillStyle='rgba(20,20,20,0.85)';
+  ctx.beginPath();
+  if(ctx.roundRect) ctx.roundRect(bx,by,tw,26,8);
+  else ctx.rect(bx,by,tw,26);
+  ctx.fill();
+  ctx.strokeStyle='#e44'; ctx.lineWidth=1.5; ctx.stroke();
+  ctx.fillStyle='#fff'; ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.fillText(text, bx+9, by+13);
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+// SLOW-MO REPLAY 慢動作重播
+// ═══════════════════════════════════════════════════════
+function triggerSlowMo() {
+  if(slowMoTimer>0) return;
+  slowMoTimer=1.8;
+  addFloat('🎬 REPLAY', CW/2, CH/2-20, '#ffe000', 30);
 }
 
 function drawEnemySkillHUD() {
