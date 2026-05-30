@@ -54,6 +54,53 @@ canvas {
 .diff-btn:hover { border-color:#f4a020; color:#f4a020; }
 .diff-btn.active { background:#f4a020; color:#000; border-color:#f4a020; font-weight:bold; }
 
+/* ── Skills UI ── */
+#skills-bar {
+  position:fixed;
+  left: calc(50% + 455px);
+  top: 50%;
+  transform: translateY(-50%);
+  display:none;
+  flex-direction:column;
+  gap:10px;
+  z-index:50;
+}
+.skill-slot {
+  width:52px; height:52px;
+  border-radius:50%;
+  border:3px solid #555;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  cursor:pointer; position:relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: rgba(0,0,0,0.7);
+}
+.skill-slot .sk-key {
+  font-size:10px; color:#888; position:absolute; top:3px;
+}
+.skill-slot .sk-icon { font-size:22px; line-height:1; }
+.skill-slot .sk-label { font-size:8px; color:#aaa; margin-top:1px; }
+.skill-slot.ready   { border-color:#fff; box-shadow: 0 0 8px rgba(255,255,255,0.3); }
+.skill-slot.active  { animation: skillPulse 0.6s infinite alternate; }
+.skill-slot.cooling { border-color:#333; }
+.skill-slot .sk-cd {
+  position:absolute; inset:0; border-radius:50%;
+  background: conic-gradient(transparent var(--pct), rgba(0,0,0,0.65) var(--pct));
+}
+@keyframes skillPulse {
+  from { transform: scale(1); }
+  to   { transform: scale(1.12); }
+}
+#skill-y { border-color: #f4e020; }
+#skill-y.ready  { box-shadow: 0 0 12px #f4e020; }
+#skill-y.active { border-color: #ffe000; box-shadow: 0 0 20px #ffe000; }
+#skill-g { border-color: #20e860; }
+#skill-g.ready  { box-shadow: 0 0 12px #20e860; }
+#skill-g.active { border-color: #00ff60; box-shadow: 0 0 20px #00ff60; }
+#skill-p { border-color: #a020f0; }
+#skill-p.ready  { box-shadow: 0 0 12px #a020f0; }
+#skill-p.active { border-color: #c050ff; box-shadow: 0 0 20px #c050ff; }
+
 /* ── Overlay ── */
 #overlay {
   position:fixed; inset:0;
@@ -121,9 +168,12 @@ canvas {
 <div id="ui-bottom">
   <div id="controls-hint">
     <span><b>WASD</b> 移動</span>
-    <span><b>J</b> 投籃（按住蓄力）</span>
-    <span><b>K</b> 傳球 / 換人</span>
+    <span><b>J</b> 投籃</span>
+    <span><b>K</b> 傳球/換人</span>
     <span><b>L</b> 搶斷</span>
+    <span><b style="color:#ffe000">1</b> 三分必進</span>
+    <span><b style="color:#00ff60">2</b> 兩分必進</span>
+    <span><b style="color:#c050ff">3</b> 自動搶板</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center">
     <span style="font-size:11px;color:#888">難度：</span>
@@ -134,6 +184,29 @@ canvas {
 </div>
 
 <div id="msg"></div>
+
+<!-- Skills Bar -->
+<div id="skills-bar">
+  <div class="skill-slot cooling" id="skill-y">
+    <span class="sk-key">1</span>
+    <span class="sk-icon">🟡</span>
+    <span class="sk-label">必進三分</span>
+    <div class="sk-cd" id="sk-cd-y"></div>
+  </div>
+  <div class="skill-slot cooling" id="skill-g">
+    <span class="sk-key">2</span>
+    <span class="sk-icon">🟢</span>
+    <span class="sk-label">必進兩分</span>
+    <div class="sk-cd" id="sk-cd-g"></div>
+  </div>
+  <div class="skill-slot cooling" id="skill-p">
+    <span class="sk-key">3</span>
+    <span class="sk-icon">🟣</span>
+    <span class="sk-label">自動搶板</span>
+    <div class="sk-cd" id="sk-cd-p"></div>
+  </div>
+</div>
+
 <div id="pw-wrap"><div id="pw-label">投籃力道</div><div id="pw-bg"><div id="pw-fill"></div></div></div>
 
 <!-- ── Main Menu ── -->
@@ -400,12 +473,20 @@ function drawPassArrow() {
 // ═══════════════════════════════════════════════════════
 function shootBall(ref, pow) {
   lastTouchTeam = ref.team;
-  const sh   = getP(ref);
-  const hoop = atkHoop(ref.team);
-  const d    = dist(sh, hoop);
-  const acc  = shotAcc(d, ref.team);
+  const sh    = getP(ref);
+  const hoop  = atkHoop(ref.team);
+  const d     = dist(sh, hoop);
+  const three = is3pt(sh.x, sh.y, ref.team);
+  const acc   = shotAcc(d, ref.team);
   const powErr = Math.abs(pow/100 - 0.65) * 0.55;
-  const made = Math.random() < clamp(acc - powErr, 0.04, 0.97);
+  let made = Math.random() < clamp(acc - powErr, 0.04, 0.97);
+
+  // ── 技能判定 ──
+  if (ref.team === 'player') {
+    if (skills.y.active && three)  { made = true; consumeSkill('y'); }
+    if (skills.g.active && !three) { made = true; consumeSkill('g'); }
+    // 若啟動了不對應的技能，不消耗（讓玩家繼續持有）
+  }
 
   ballHolder=null; ballFree=false; ballInAir=true;
   ball.x=sh.x; ball.y=sh.y; ball.z=0;
@@ -500,9 +581,23 @@ function updateBall(dt) {
         if (pScore>=goalScore || eScore>=goalScore) { endGame(); return; }
         resetAfterScore(team);
       } else {
-        ballFree=true; ballHolder=null;
-        ball.vx=(Math.random()-0.5)*3.5; ball.vy=(Math.random()-0.5)*3.5;
-        showMsg('籃板！','#8cf');
+        // 紫色技能：對方投籃未進 → 自動給我方最近球員
+        const missTeam = ball.targetHoop.shooter.team;
+        if (skills.p.active && missTeam === 'enemy') {
+          // 找距離最近的我方球員
+          let nearI=0, nearD=9999;
+          for (let i=0;i<3;i++) {
+            const d2=dist(players[i], ball);
+            if (d2<nearD){ nearD=d2; nearI=i; }
+          }
+          catchBall({team:'player', idx:nearI});
+          showMsg('🟣 自動搶板！球回到我方！','#c050ff');
+          consumeSkill('p');
+        } else {
+          ballFree=true; ballHolder=null;
+          ball.vx=(Math.random()-0.5)*3.5; ball.vy=(Math.random()-0.5)*3.5;
+          showMsg('籃板！','#8cf');
+        }
       }
     }
     return;
@@ -746,6 +841,65 @@ function updateEnemyAI(dt) {
 }
 
 // ═══════════════════════════════════════════════════════
+// SKILLS
+// ═══════════════════════════════════════════════════════
+const SKILL_MAX_CD = { y:18, g:18, p:22 };
+const skills = {
+  y: { active:false, cd:0 }, // 黃：三分必進
+  g: { active:false, cd:0 }, // 綠：兩分必進
+  p: { active:false, cd:0 }, // 紫：對方未進自動搶板
+};
+
+function activateSkill(id) {
+  const sk = skills[id];
+  if (sk.cd > 0)     { showMsg('技能冷卻中…', '#888'); return; }
+  if (sk.active)     { showMsg('技能已啟動！', '#888'); return; }
+  const names = { y:'🟡 三分必進！', g:'🟢 兩分必進！', p:'🟣 自動搶板！' };
+  const cols  = { y:'#ffe000', g:'#00ff60', p:'#c050ff' };
+  sk.active = true;
+  showMsg(names[id], cols[id]);
+  updateSkillUI();
+}
+
+function consumeSkill(id) {
+  skills[id].active = false;
+  skills[id].cd = SKILL_MAX_CD[id];
+  updateSkillUI();
+}
+
+function updateSkillUI() {
+  const ids = ['y','g','p'];
+  ids.forEach(id => {
+    const slot = document.getElementById('skill-'+id);
+    const cov  = document.getElementById('sk-cd-'+id);
+    const sk   = skills[id];
+    slot.classList.remove('ready','active','cooling');
+    if (sk.active) {
+      slot.classList.add('active');
+      cov.style.setProperty('--pct','0deg');
+    } else if (sk.cd > 0) {
+      slot.classList.add('cooling');
+      const pct = (sk.cd / SKILL_MAX_CD[id]) * 360;
+      cov.style.setProperty('--pct', pct+'deg');
+    } else {
+      slot.classList.add('ready');
+      cov.style.setProperty('--pct','0deg');
+    }
+  });
+}
+
+function updateSkillCooldowns(dt) {
+  let changed = false;
+  ['y','g','p'].forEach(id => {
+    if (skills[id].cd > 0) {
+      skills[id].cd = Math.max(0, skills[id].cd - dt);
+      changed = true;
+    }
+  });
+  if (changed) updateSkillUI();
+}
+
+// ═══════════════════════════════════════════════════════
 // L — STEAL
 // ═══════════════════════════════════════════════════════
 let stealCdPlayer = 0;
@@ -816,6 +970,11 @@ function onKeyDown(e) {
 
   // L — steal
   if (k==='l') doSteal();
+
+  // 1/2/3 — skills
+  if (k==='1') activateSkill('y');
+  if (k==='2') activateSkill('g');
+  if (k==='3') activateSkill('p');
 }
 
 function onKeyUp(e) {
@@ -946,6 +1105,7 @@ function loop(ts) {
   updateBall(dt);
   updatePowerCharge(dt);
   stealCdPlayer = Math.max(0, stealCdPlayer - dt);
+  updateSkillCooldowns(dt);
   checkPickup();
 
   ctx.clearRect(0,0,CW,CH);
@@ -963,12 +1123,15 @@ function loop(ts) {
 function startGame() {
   pScore=0; eScore=0; shotClock=24;
   chargingShot=false; shootPow=0; stealCdPlayer=0; lastTouchTeam='player';
+  ['y','g','p'].forEach(id=>{ skills[id].active=false; skills[id].cd=0; });
+  updateSkillUI();
   ballInAir=false; ballFree=false;
   cfg=DIFF[difficulty];
   tmAiT=[0,0,0]; eAiT=0;
   initPlayers();
   updateScoreUI();
   document.getElementById('overlay').style.display='none';
+  document.getElementById('skills-bar').style.display='flex';
   gameRunning=true;
   lastTime=performance.now();
   animId=requestAnimationFrame(loop);
