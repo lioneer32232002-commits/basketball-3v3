@@ -139,6 +139,7 @@ canvas {
     <span><b>Z</b> 傳給1號</span>
     <span><b>X</b> 傳給2號</span>
     <span><b>C</b> 傳給3號</span>
+    <span><b>L</b> 搶斷</span>
     <span><b>K</b> 換人</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center">
@@ -736,6 +737,42 @@ function updateEnemyAI(dt) {
 }
 
 // ═══════════════════════════════════════════════════════
+// L — STEAL
+// ═══════════════════════════════════════════════════════
+let stealCdPlayer = 0;
+
+function doSteal() {
+  if (stealCdPlayer > 0) { showMsg(`搶斷冷卻中…`, '#888'); return; }
+  const me = players[ctrlIdx];
+  if (ballHolder && ballHolder.team === 'enemy') {
+    const bh = getP(ballHolder);
+    if (bh && dist(me, bh) < 42) {
+      const chance = 0.55 - (dist(me, bh) / 42) * 0.2;
+      if (Math.random() < chance) {
+        dropBall();
+        showMsg('🔥 搶斷成功！', '#4ef');
+      } else {
+        showMsg('搶斷失敗', '#888');
+      }
+    } else {
+      showMsg('距離太遠', '#888');
+    }
+  } else if (ballInAir && ball._passTarget && ball._passTarget.team === 'enemy') {
+    // Intercept enemy pass
+    const d = dist(me, ball);
+    if (d < 50) {
+      catchBall({ team: 'player', idx: ctrlIdx });
+      showMsg('🔥 截球！', '#4ef');
+    } else {
+      showMsg('沒截到', '#888');
+    }
+  } else {
+    showMsg('沒有可搶的球', '#888');
+  }
+  stealCdPlayer = 1.5;
+}
+
+// ═══════════════════════════════════════════════════════
 // ZXC — DIRECTED PASS TO JERSEY NUMBER
 // ═══════════════════════════════════════════════════════
 // Z=傳給1號  X=傳給2號  C=傳給3號
@@ -770,6 +807,9 @@ function onKeyDown(e) {
   if (k==='z') doDirectPass(1);
   if (k==='x') doDirectPass(2);
   if (k==='c') doDirectPass(3);
+
+  // Steal
+  if (k==='l') doSteal();
 
   // Shoot charge
   if (k==='j') {
@@ -943,6 +983,7 @@ function loop(ts) {
   updateBall(dt);
   updatePowerCharge(dt);
   updatePassHintUI();
+  stealCdPlayer = Math.max(0, stealCdPlayer - dt);
   checkPickup();
 
   ctx.clearRect(0,0,CW,CH);
@@ -959,7 +1000,7 @@ function loop(ts) {
 // ═══════════════════════════════════════════════════════
 function startGame() {
   pScore=0; eScore=0; shotClock=24;
-  chargingShot=false; shootPow=0;
+  chargingShot=false; shootPow=0; stealCdPlayer=0;
   ballInAir=false; ballFree=false;
   cfg=DIFF[difficulty];
   tmAiT=[0,0,0]; eAiT=0;
