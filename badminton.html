@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>雙人羽毛球 Badminton</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; }
+body {
+  background:#0c1f16;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  min-height:100vh; min-height:100dvh;
+  font-family:'Arial Black','Segoe UI',sans-serif;
+  color:#fff; overflow:hidden; user-select:none;
+  -webkit-user-select:none; -webkit-tap-highlight-color:transparent;
+}
+#wrap {
+  width:min(760px, 100vw);
+  display:flex; flex-direction:column;
+}
+#ui-top {
+  display:flex; align-items:center; justify-content:space-between;
+  width:100%; padding:8px 22px;
+  background:rgba(0,0,0,0.55);
+  border-radius:12px 12px 0 0;
+  border:2px solid #4ad07a; border-bottom:none;
+}
+.score-box { text-align:center; min-width:90px; }
+.score-box .label { font-size:12px; color:#9fb; letter-spacing:2px; }
+.score-box .score { font-size:46px; line-height:1; color:#4ad07a; }
+.score-box.p2 .label { color:#fcb; }
+.score-box.p2 .score { color:#ff7a7a; }
+#mid-box { text-align:center; }
+#mid-box .target { font-size:12px; color:#888; }
+#mid-box .serve { font-size:13px; color:#ffd24a; margin-top:3px; min-height:18px; }
+#court-area {
+  width:100%;
+  border-left:2px solid #4ad07a; border-right:2px solid #4ad07a;
+  line-height:0;
+}
+canvas {
+  display:block;
+  width:100%; height:auto;
+  outline:none; background:#13402a;
+  touch-action:none;
+}
+#ui-bottom {
+  width:100%; padding:8px 18px;
+  background:rgba(0,0,0,0.55);
+  border-radius:0 0 12px 12px;
+  border:2px solid #4ad07a; border-top:1px solid #2a4;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+  font-size:12px; color:#ccc; text-align:center;
+}
+
+/* 手機：填滿螢幕高度（直式球場）*/
+@media (max-width:700px){
+  body{ justify-content:flex-start; }
+  #wrap{ height:100vh; height:100dvh; }
+  #ui-top{ border-radius:0; }
+  #ui-bottom{ border-radius:0; }
+  #court-area{ flex:1 1 auto; min-height:0; position:relative; }
+  canvas{ position:absolute; inset:0; width:100%; height:100%; }
+}
+#hint b { color:#4ad07a; }
+#hint .p2b { color:#ff7a7a; }
+#overlay {
+  position:fixed; inset:0; z-index:10;
+  display:flex; align-items:center; justify-content:center;
+  text-align:center; padding:18px; overflow-y:auto;
+  background:
+    radial-gradient(circle at 50% 28%, rgba(74,208,122,0.12), transparent 58%),
+    linear-gradient(160deg, #0b2418 0%, #0c1f16 45%, #06120b 100%);
+}
+#overlay.hidden { display:none; }
+
+/* 細緻的場線質感背景 */
+#overlay::before{
+  content:''; position:absolute; inset:0; pointer-events:none; opacity:0.06;
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 38px, rgba(255,255,255,0.5) 38px 39px),
+    repeating-linear-gradient(90deg, transparent 0 38px, rgba(255,255,255,0.5) 38px 39px);
+}
+
+.panel{
+  position:relative; width:100%; max-width:440px;
+  background:rgba(11,28,20,0.72);
+  border:1px solid rgba(74,208,122,0.35); border-radius:22px;
+  box-shadow:0 24px 60px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+  backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+  padding:30px 26px 26px;
+}
+.panel[hidden]{ display:none; }
+
+.shuttle-anim{ font-size:48px; line-height:1; animation:floaty 2.6s ease-in-out infinite; }
+@keyframes floaty{ 0%,100%{ transform:translateY(0) rotate(-7deg);} 50%{ transform:translateY(-13px) rotate(7deg);} }
+
+.panel h1{
+  font-size:clamp(34px,9vw,54px); letter-spacing:7px; margin:6px 0 6px; font-weight:900;
+  background:linear-gradient(180deg,#b8f7d0,#4ad07a 70%);
+  -webkit-background-clip:text; background-clip:text;
+  color:transparent; -webkit-text-fill-color:transparent;
+  filter:drop-shadow(0 3px 12px rgba(74,208,122,0.45));
+}
+.panel h2{ color:#4ad07a; font-size:22px; letter-spacing:4px; margin-bottom:16px; }
+.subtitle{ color:#8fae9c; font-size:13px; letter-spacing:2px; margin-bottom:22px; }
+
+.mode-row{ display:flex; gap:14px; justify-content:center; margin-bottom:14px; }
+.mode-btn{
+  flex:1; max-width:165px; display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:16px 10px; border:none; border-radius:16px; cursor:pointer; font-family:inherit; color:#053019;
+  background:linear-gradient(180deg,#62e28e,#39b667);
+  box-shadow:0 6px 18px rgba(57,182,103,0.38);
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.mode-btn.alt{ color:#eafff1; background:linear-gradient(180deg,#3c7d57,#295c40); box-shadow:0 6px 18px rgba(0,0,0,0.4); }
+.mode-btn:hover{ transform:translateY(-3px); box-shadow:0 12px 26px rgba(57,182,103,0.5); }
+.mode-btn:active{ transform:translateY(-1px); }
+.mode-btn .ico{ font-size:27px; }
+.mode-btn .txt{ font-size:19px; font-weight:900; letter-spacing:1px; }
+.mode-btn .sub{ font-size:11px; opacity:0.82; letter-spacing:1px; }
+
+.ghost{
+  margin-top:8px; padding:10px 20px; font-family:inherit; font-size:13px; letter-spacing:1px;
+  background:transparent; color:#7fcf9c; border:1px solid rgba(127,207,156,0.4);
+  border-radius:10px; cursor:pointer; transition:background .12s;
+}
+.ghost:hover{ background:rgba(127,207,156,0.13); }
+
+/* 教學頁 */
+.tut{ text-align:left; max-width:330px; margin:0 auto 14px; }
+.tut .row{ display:flex; align-items:center; gap:12px; margin-bottom:12px; color:#d4efdd; font-size:14px; line-height:1.4; }
+.tut .badge{ flex:none; min-width:74px; text-align:center; font-weight:bold; color:#fff; font-size:13px;
+  background:rgba(255,255,255,0.09); border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:7px 4px; }
+.tut .badge.p2{ color:#ff9a9a; border-color:rgba(255,122,122,0.4); }
+.court-mini{ width:160px; height:120px; margin:4px auto 16px; position:relative;
+  border:2px solid rgba(255,255,255,0.55); border-radius:8px; background:#1c6b41;
+  box-shadow:0 8px 20px rgba(0,0,0,0.4); }
+.court-mini .net{ position:absolute; left:-2px; right:-2px; top:50%; height:3px; transform:translateY(-50%); background:#fff; }
+.court-mini .lbl{ position:absolute; left:0; right:0; text-align:center; font-size:11px; letter-spacing:1px; }
+.court-mini .top{ top:12%; color:#ff9a9a; }
+.court-mini .bot{ bottom:24%; color:#9bf3bd; }
+.court-mini .finger{ position:absolute; font-size:22px; bottom:8%; left:50%; margin-left:-11px;
+  animation:dragx 1.9s ease-in-out infinite; }
+@keyframes dragx{ 0%,100%{ transform:translateX(-22px);} 50%{ transform:translateX(22px);} }
+.tut-common{ color:#9fc4ad; font-size:13px; line-height:1.7; max-width:340px; margin:0 auto 16px; }
+.tut-common b{ color:#ffd24a; }
+
+.touch-only{ display:none; }
+body.touch .touch-only{ display:block; }
+body.touch .desktop-only{ display:none; }
+</style>
+</head>
+<body>
+
+<div id="wrap">
+<div id="ui-top">
+  <div class="score-box p1">
+    <div class="label" id="label1">玩家 1（綠）</div>
+    <div class="score" id="score1">0</div>
+  </div>
+  <div id="mid-box">
+    <div class="target">先到 21 分（領先 2 分）</div>
+    <div class="serve" id="serve-msg"></div>
+  </div>
+  <div class="score-box p2">
+    <div class="label" id="label2">玩家 2（紅）</div>
+    <div class="score" id="score2">0</div>
+  </div>
+</div>
+
+<div id="court-area"><canvas id="game" width="760" height="560"></canvas></div>
+
+<div id="ui-bottom">
+  <div id="hint">手指拖動移動・靠近自動擊球</div>
+  <div id="hint2">球在高處自動殺球　|　<b>M</b> 靜音</div>
+</div>
+</div>
+
+<div id="overlay">
+  <!-- 首頁 -->
+  <div id="home" class="panel">
+    <div class="shuttle-anim">🏸</div>
+    <h1>羽毛球</h1>
+    <div class="subtitle">俯視對戰 · 落地得分 · 先到 21 分</div>
+    <div class="mode-row">
+      <button id="soloBtn" class="mode-btn">
+        <span class="ico">🤖</span><span class="txt">單人</span><span class="sub">對電腦</span>
+      </button>
+      <button id="duoBtn" class="mode-btn alt">
+        <span class="ico">👥</span><span class="txt">雙人</span><span class="sub">同機對戰</span>
+      </button>
+    </div>
+    <button id="howBtn" class="ghost">📖 操作教學</button>
+  </div>
+
+  <!-- 教學頁 -->
+  <div id="tutorial" class="panel" hidden>
+    <h2>操作教學</h2>
+
+    <!-- 桌面：鍵盤 -->
+    <div class="tut desktop-only">
+      <div class="row"><span class="badge">W A S D</span><span>玩家 1（綠）移動</span></div>
+      <div class="row"><span class="badge">空白鍵</span><span>玩家 1 擊球（也會自動）</span></div>
+      <div class="row"><span class="badge p2">方向鍵</span><span>玩家 2（紅）移動</span></div>
+      <div class="row"><span class="badge p2">Enter</span><span>玩家 2 擊球（也會自動）</span></div>
+    </div>
+
+    <!-- 手機：觸控 -->
+    <div class="tut touch-only">
+      <div class="court-mini">
+        <div class="net"></div>
+        <div class="lbl top">對手 / 玩家2</div>
+        <div class="lbl bot">你的半場</div>
+        <div class="finger">👆</div>
+      </div>
+      <div class="row"><span class="badge">拖動</span><span>手指在<b>自己半場</b>拖動 → 移動球員</span></div>
+      <div class="row"><span class="badge">靠近</span><span>移到球附近 → <b>自動回擊</b></span></div>
+      <div class="row"><span class="badge">左右</span><span>往左右移動 → 控制落點</span></div>
+      <div class="row"><span class="badge">雙人</span><span>兩人各按住一邊（多點觸控）</span></div>
+    </div>
+
+    <p class="tut-common">球在<b>高處自動殺球</b>；連續對拉球會<b>越來越快 🔥</b>；陰影離球越遠＝飛得越高。</p>
+    <button id="backBtn" class="ghost">← 返回</button>
+  </div>
+
+  <!-- 結算頁 -->
+  <div id="result" class="panel" hidden>
+    <div class="shuttle-anim">🏆</div>
+    <h1 id="winTitle">獲勝！</h1>
+    <div class="subtitle" id="winScore">0 : 0</div>
+    <div class="mode-row">
+      <button id="replayBtn" class="mode-btn"><span class="ico">🔁</span><span class="txt">再玩一次</span></button>
+      <button id="switchBtn" class="mode-btn alt"><span class="ico">🔀</span><span class="txt">換模式</span></button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ---- 球場座標（依裝置自適應）----
+// 俯視：x 橫向，y 縱向（上＝P2 場，下＝P1 場）。z 為高度。
+// W/H 為畫布內部解析度；手機用直式填滿、桌機維持 760×560。
+// S 為相對原始(球場高 480)的縮放係數，物理與視覺大小都乘上 S 以保持手感一致。
+let W = 760, H = 560, S = 1;
+let COURT = { x:90, y:40, w:580, h:480 };
+let NET_Y = COURT.y + COURT.h/2;
+
+function layout(){
+  const mobile = window.matchMedia('(max-width:700px)').matches;
+  if(mobile){
+    const area = document.getElementById('court-area');
+    W = Math.max(240, Math.round(area.clientWidth));
+    H = Math.max(240, Math.round(area.clientHeight));
+  } else {
+    W = 760; H = 560;
+  }
+  canvas.width = W; canvas.height = H;
+  const mx = Math.round(W*0.118), my = Math.round(H*0.071);
+  COURT = { x:mx, y:my, w:W-mx*2, h:H-my*2 };
+  NET_Y = COURT.y + COURT.h/2;
+  S = COURT.h / 480;
+  if(p1) p1.reach = 72*S;
+  if(p2) p2.reach = 72*S;
+  // 夾住現有位置避免跑出新球場
+  if(p1){ p1.x=clamp(p1.x,COURT.x+4,COURT.x+COURT.w-4); p1.y=clamp(p1.y,NET_Y+4,COURT.y+COURT.h-4); }
+  if(p2){ p2.x=clamp(p2.x,COURT.x+4,COURT.x+COURT.w-4); p2.y=clamp(p2.y,COURT.y+4,NET_Y-4); }
+}
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+// ---- 遊戲狀態 ----
+const STATE = { MENU:0, SERVE:1, RALLY:2, POINT:3, OVER:4 };
+let state = STATE.MENU;
+
+const keys = {};
+window.addEventListener('keydown', e=>{
+  keys[e.code] = true;
+  if(e.code==='KeyM'){ soundOn = !soundOn; initAudio(); }
+  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter'].includes(e.code)) e.preventDefault();
+});
+window.addEventListener('keyup', e=>{ keys[e.code] = false; });
+
+// ---- 玩家 ----
+function makePlayer(isP1){
+  return {
+    isP1,
+    x: W/2,
+    y: isP1 ? COURT.y + COURT.h*0.78 : COURT.y + COURT.h*0.22,
+    vx:0, vy:0,
+    px:0, py:0,            // 上一幀位置
+    reach: 72*S,           // 擊球範圍（加大、更好打，隨場地縮放）
+    hitCd: 0,              // 擊球冷卻
+    touch: null,           // 觸控目標 {x,y}（手機）
+    swingTimer: 0,         // 揮拍動畫
+    color: isP1 ? '#4ad07a' : '#ff7a7a',
+    dark: isP1 ? '#2a8f52' : '#c24',
+  };
+}
+let p1, p2;
+
+// ---- 羽球 ----
+let bird = { x:W/2, y:0, z:0, vx:0, vy:0, vz:0, owner:null, alive:false, spin:0 };
+
+let score1 = 0, score2 = 0;
+let mode = 'duo';          // 'solo'=單人對電腦, 'duo'=雙人
+let aiActive = false;      // 紅方是否由電腦控制
+let aiServeDelay = 0;      // AI 發球前的延遲
+let server = 1;            // 哪邊發球
+let lastHitter = null;
+let serveMsg = '';
+let pointFlash = 0;        // 得分閃爍計時
+let pointText = '';
+
+const GRAV = 0.45;
+const SPEED = 4.4;
+
+// ---- 特效狀態 ----
+let trail = [];            // 羽球殘影
+let particles = [];        // 火花/粒子
+let floats = [];           // 浮動文字
+let shake = 0;             // 螢幕震動強度
+let rally = 0;             // 本回合連續來回拍數
+let bestRally = 0;         // 最佳連拍紀錄
+let serveBlink = 0;        // 發球箭頭閃爍
+let freeze = 0;            // 殺球命中定格（hit-stop）
+let tick = 0;              // 全域幀計數（給觀眾擺動用）
+let crowdEnergy = 0;       // 觀眾興奮度 0~1
+let lastScorer = 0;        // 上一個得分者
+let streak = 0;            // 連續得分數
+let lastShotSmash = false; // 最近一拍是否為殺球（決定殘影顏色）
+
+// ---- 音效（Web Audio，無需外部檔案）----
+let audioCtx = null, soundOn = true;
+function initAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
+function tone(freq, dur, type='sine', vol=0.25, slideTo=null){
+  if(!soundOn || !audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t);
+  if(slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t+dur);
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t+dur);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t+dur);
+}
+function sfxHit(){ tone(520, 0.06, 'square', 0.18, 360); }          // 一般擊球「啪」
+function sfxSmash(){ tone(180, 0.18, 'sawtooth', 0.3, 60); tone(900,0.05,'square',0.2); } // 殺球
+function sfxNet(){ tone(140, 0.15, 'triangle', 0.25, 90); }         // 掛網
+function sfxScore(){ [523,659,784].forEach((f,i)=> setTimeout(()=>tone(f,0.18,'triangle',0.3), i*90)); } // 得分上揚
+function sfxWin(){ [523,659,784,1047].forEach((f,i)=> setTimeout(()=>tone(f,0.25,'triangle',0.32), i*130)); }
+function sfxCheer(){                                                  // 觀眾歡呼（濾波雜訊）
+  if(!soundOn || !audioCtx) return;
+  const dur = 0.55, sr = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, sr*dur, sr);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<d.length;i++){ d[i] = (Math.random()*2-1) * Math.pow(1-i/d.length, 1.4); }
+  const src = audioCtx.createBufferSource(); src.buffer = buf;
+  const flt = audioCtx.createBiquadFilter(); flt.type='bandpass'; flt.frequency.value=1100; flt.Q.value=0.6;
+  const g = audioCtx.createGain(); g.gain.value=0.22;
+  src.connect(flt); flt.connect(g); g.connect(audioCtx.destination);
+  src.start();
+}
+
+// ---- 特效輔助 ----
+function spawnParticles(x, y, color, n, spd){
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2;
+    const s = spd*(0.4+Math.random()*0.8);
+    particles.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, life:1, color });
+  }
+}
+function addFloat(x, y, text, color, size=20){
+  floats.push({ x, y, text, color, size, life:1 });
+}
+function updateEffects(){
+  if(shake>0) shake *= 0.85;
+  if(shake<0.3) shake = 0;
+  if(serveBlink>0) serveBlink--; else serveBlink = 40;
+  for(const p of particles){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.15; p.vx*=0.94; p.life-=0.035; }
+  particles = particles.filter(p=>p.life>0);
+  for(const f of floats){ f.y-=0.8; f.life-=0.02; }
+  floats = floats.filter(f=>f.life>0);
+  // 殘影淡出
+  for(const t of trail){ t.life-=0.08; }
+  trail = trail.filter(t=>t.life>0);
+}
+
+function resetServe(){
+  state = STATE.SERVE;
+  const srv = server===1 ? p1 : p2;
+  // 發球方站位
+  p1.x = W*0.5; p1.y = COURT.y + COURT.h*0.78;
+  p2.x = W*0.5; p2.y = COURT.y + COURT.h*0.22;
+  bird.alive = true;
+  bird.owner = server;
+  bird.vx = bird.vy = bird.vz = 0;
+  bird.x = srv.x;
+  bird.y = srv.y + (server===1 ? -10 : 10)*S;
+  bird.z = 70*S;
+  lastHitter = null;
+  aiServeDelay = 45;          // AI 發球前稍作停頓
+  // 重置上一幀位置，避免首次擊球讀到假的移動量
+  p1.px = p1.x; p1.py = p1.y;
+  p2.px = p2.x; p2.py = p2.y;
+  serveMsg = (server===1 ? '玩家 1' : '玩家 2') + ' 發球　按擊球鍵發出';
+  document.getElementById('serve-msg').textContent = serveMsg;
+}
+
+function startGame(m){
+  mode = m || 'duo';
+  aiActive = (mode === 'solo');
+  document.getElementById('label2').textContent = aiActive ? '電腦（紅）' : '玩家 2（紅）';
+  layout();
+  p1 = makePlayer(true);
+  p2 = makePlayer(false);
+  score1 = 0; score2 = 0;
+  server = 1;
+  rally = 0; bestRally = 0;
+  trail = []; particles = []; floats = []; shake = 0;
+  freeze = 0; crowdEnergy = 0; lastScorer = 0; streak = 0;
+  initAudio();
+  updateScore();
+  document.getElementById('overlay').classList.add('hidden');
+  resetServe();
+}
+
+function updateScore(){
+  document.getElementById('score1').textContent = score1;
+  document.getElementById('score2').textContent = score2;
+}
+
+// ---- 擊球（簡化操作）----
+// 規則：站到球附近按擊球鍵就會自動回擊。球在高處 → 自動殺球，否則 → 高弧回擊。
+//       按住左右方向鍵控制落點。發球固定為好打的高拋球。
+function tryHit(player, hitKey){
+  if(!hitKey || !bird.alive || player.hitCd>0) return;
+  const dist = Math.hypot(bird.x-player.x, bird.y-player.y);
+  if(dist > player.reach || bird.z > 175*S) return;
+
+  player.swingTimer = 8;
+  player.hitCd = 14;                         // 擊球冷卻，避免按住連發
+  const dirY = player.isP1 ? -1 : 1;          // P1 往上打、P2 往下打
+
+  // 落點左右：鍵盤用左右鍵；觸控/AI 用當下的移動方向
+  let aim = 0;
+  if(player.isP1){ if(keys['KeyA']) aim-=1; if(keys['KeyD']) aim+=1; }
+  else { if(keys['ArrowLeft']) aim-=1; if(keys['ArrowRight']) aim+=1; }
+  if(aim===0){
+    const mvx = player.x - player.px;
+    if(Math.abs(mvx) > 0.5) aim = mvx > 0 ? 1 : -1;
+  }
+
+  initAudio();
+  lastHitter = player.isP1 ? 1 : 2;
+  bird.owner = null;
+
+  // ---- 發球：固定的好打高拋球，預設往對面場中央 ----
+  if(state === STATE.SERVE){
+    bird.vy = dirY * 6.2 * S;
+    bird.vz = 9.5 * S;
+    bird.vx = aim*2.0*S + (W/2 - bird.x)*0.015;
+    bird.spin = 0;
+    lastShotSmash = false;
+    sfxHit();
+    spawnParticles(bird.x, bird.y-bird.z*0.55, '#fff', 7, 2.6);
+    addFloat(player.x, player.y-24, '發球', '#ffd24a', 18);
+    state = STATE.RALLY; rally = 0;
+    serveMsg = '';
+    document.getElementById('serve-msg').textContent = '';
+    return;
+  }
+
+  // ---- 一般回擊：球種依「球的高度」自動決定 ----
+  const heat = 1 + Math.min(rally*0.025, 0.45);   // 連拍越多球越快
+  const high = bird.z > 95*S;
+  let power, lift, shotName, shotColor, isSmash=false;
+  if(high){
+    power = 10.5; lift = 2.5; isSmash = true; bird.spin = 1;
+    shotName = '殺球！'; shotColor = '#ffd24a';
+  } else {
+    power = 7.2; lift = 8.5; bird.spin = 0;
+    shotName = '回擊'; shotColor = '#ffffff';
+  }
+  bird.vy = dirY * power * heat * S;
+  bird.vz = lift * S;
+  bird.vx = aim * 3.4 * S;
+  lastShotSmash = isSmash;
+
+  // ---- 特效 ----
+  if(isSmash){ sfxSmash(); shake = 9; freeze = 4; spawnParticles(bird.x, bird.y-bird.z*0.55, '#ffd24a', 14, 4.5); }
+  else { sfxHit(); spawnParticles(bird.x, bird.y-bird.z*0.55, '#fff', 7, 2.6); }
+  addFloat(player.x, player.y-24, shotName, shotColor, isSmash?26:18);
+
+  // 連拍計數
+  rally++;
+  if(rally>=3 && rally%3===0) addFloat(W/2, NET_Y, (heat>1.3?'🔥 ':'')+'連拍 '+rally+'！', heat>1.3?'#ff9a3a':'#ffd24a', 22);
+}
+
+// ---- 得分判定 ----
+function awardPoint(winner, reason){
+  state = STATE.POINT;
+  bird.alive = false;
+  if(winner===1){ score1++; pointText = '玩家 1 得分！'; }
+  else { score2++; pointText = '玩家 2 得分！'; }
+  pointText += '　(' + reason + ')';
+  pointFlash = 90;
+  server = winner;   // 得分方發球（rally point）
+  updateScore();
+
+  // 特效：落地爆裂 + 震動 + 音效 + 觀眾歡呼
+  const landColor = (reason==='出界'||reason==='掛網'||reason==='發球出界') ? '#ff7a7a' : '#ffd24a';
+  spawnParticles(bird.x, bird.y, landColor, 18, 5);
+  addFloat(bird.x, bird.y-10, reason, landColor, 18);
+  shake = 11;
+  crowdEnergy = 1;
+  sfxScore();
+  setTimeout(sfxCheer, 120);
+
+  // 連續得分氣勢
+  if(winner===lastScorer) streak++; else { streak = 1; lastScorer = winner; }
+  if(streak>=2) addFloat(W/2, winner===1 ? NET_Y+90 : NET_Y-90, '連得 '+streak+' 分！', winner===1?'#4ad07a':'#ff7a7a', 22);
+
+  // 紀錄最佳連拍
+  if(rally > bestRally) bestRally = rally;
+  rally = 0;
+
+  // 勝利判定
+  if((score1>=21 || score2>=21) && Math.abs(score1-score2)>=2){
+    state = STATE.OVER;
+    setTimeout(sfxWin, 200);
+    showOver(winner);
+  }
+}
+
+function showPanel(id){
+  ['home','tutorial','result'].forEach(p=>{ document.getElementById(p).hidden = (p!==id); });
+  document.getElementById('overlay').classList.remove('hidden');
+}
+
+function showOver(winner){
+  const winName = winner===1 ? '玩家 1' : (aiActive ? '電腦' : '玩家 2');
+  document.getElementById('winTitle').textContent = winName + ' 獲勝！';
+  document.getElementById('winScore').textContent = score1 + ' : ' + score2 + '　｜　最佳連拍 ' + bestRally;
+  document.querySelector('#switchBtn .txt').textContent = (mode==='solo' ? '改雙人' : '改單人');
+  showPanel('result');
+}
+
+// ---- 更新 ----
+function update(){
+  if(state===STATE.MENU || state===STATE.OVER) return;
+
+  updateEffects();
+  tick++;
+  if(crowdEnergy>0) crowdEnergy *= 0.96;
+  if(p1.hitCd>0) p1.hitCd--;
+  if(p2.hitCd>0) p2.hitCd--;
+
+  // ---- 玩家 1（下半場）：觸控優先，否則鍵盤 ----
+  if(p1.touch) moveToward(p1, p1.touch.x, p1.touch.y, NET_Y+4, COURT.y+COURT.h-4);
+  else movePlayer(p1, 'KeyW','KeyS','KeyA','KeyD', NET_Y+4, COURT.y+COURT.h-4);
+
+  // ---- 玩家 2（上半場）：AI / 觸控 / 鍵盤 ----
+  if(aiActive){
+    updateAI();
+  } else if(p2.touch){
+    moveToward(p2, p2.touch.x, p2.touch.y, COURT.y+4, NET_Y-4);
+  } else {
+    movePlayer(p2, 'ArrowUp','ArrowDown','ArrowLeft','ArrowRight', COURT.y+4, NET_Y-4);
+  }
+
+  if(p1.swingTimer>0) p1.swingTimer--;
+  if(p2.swingTimer>0) p2.swingTimer--;
+
+  // 擊球輸入（鍵盤鍵 或 觸控中=自動回擊）
+  tryHit(p1, keys['Space'] || !!p1.touch);
+  if(!aiActive) tryHit(p2, keys['Enter'] || !!p2.touch);
+
+  if(state===STATE.POINT){
+    if(pointFlash>0) pointFlash--;
+    if(pointFlash<=0) resetServe();
+    // 記錄玩家上一幀位置
+    p1.px=p1.x; p1.py=p1.y; p2.px=p2.x; p2.py=p2.y;
+    return;
+  }
+
+  // 發球時球跟著發球員
+  if(state===STATE.SERVE && bird.alive){
+    const srv = server===1 ? p1 : p2;
+    bird.x = srv.x;
+    bird.y = srv.y + (server===1 ? -10 : 10)*S;
+    bird.z = 70*S;
+  }
+
+  // 羽球物理（殺球命中後短暫定格，增加衝擊感）
+  if(state===STATE.RALLY && bird.alive){
+    if(freeze>0){
+      freeze--;
+    } else {
+      bird.x += bird.vx;
+      bird.y += bird.vy;
+      bird.z += bird.vz;
+      bird.vz -= GRAV*S;
+      // 羽球空氣阻力（飄）：水平速度逐漸衰減，尾段下墜明顯
+      bird.vx *= 0.985;
+      bird.vy *= 0.992;
+      if(bird.vz < 0) bird.vz *= 0.985;
+
+      // 殘影（殺球為金色）
+      trail.push({ x:bird.x, y:bird.y - bird.z*0.55, life:1, smash:lastShotSmash });
+      if(trail.length>14) trail.shift();
+
+      checkBirdEvents();
+    }
+  }
+
+  // 記錄玩家上一幀位置（給下一幀算擊球方向）
+  p1.px=p1.x; p1.py=p1.y;
+  p2.px=p2.x; p2.py=p2.y;
+}
+
+function movePlayer(p, up,down,left,right, yMin,yMax){
+  let ax=0, ay=0;
+  if(keys[up]) ay-=1;
+  if(keys[down]) ay+=1;
+  if(keys[left]) ax-=1;
+  if(keys[right]) ax+=1;
+  if(ax&&ay){ ax*=0.707; ay*=0.707; }
+  p.x += ax*SPEED*S;
+  p.y += ay*SPEED*S;
+  // 限制在自己半場
+  p.x = Math.max(COURT.x+4, Math.min(COURT.x+COURT.w-4, p.x));
+  p.y = Math.max(yMin, Math.min(yMax, p.y));
+}
+
+// 朝目標點移動（觸控用）
+function moveToward(p, tx, ty, yMin, yMax){
+  tx = Math.max(COURT.x+4, Math.min(COURT.x+COURT.w-4, tx));
+  ty = Math.max(yMin, Math.min(yMax, ty));
+  const dx = tx-p.x, dy = ty-p.y, d = Math.hypot(dx,dy);
+  const spd = SPEED*1.15*S;
+  if(d > spd){ p.x += dx/d*spd; p.y += dy/d*spd; }
+  else { p.x = tx; p.y = ty; }
+}
+
+// 電腦對手（控制紅方 P2，上半場）
+function updateAI(){
+  const p = p2;
+  let tx = W/2, ty = COURT.y + COURT.h*0.26;   // 預設回防位置
+  if(bird.alive){
+    if(state===STATE.SERVE && server===2){
+      tx = p.x; ty = p.y;                       // 發球前待在原地
+    } else if(bird.vy < 0 || bird.y < NET_Y){
+      // 球往 P2 半場飛：預測落點並上前
+      tx = bird.x + bird.vx*9;
+      ty = bird.z > 95*S ? NET_Y - 60*S : COURT.y + COURT.h*0.30;
+    } else {
+      tx = bird.x*0.35 + (W/2)*0.65;            // 球在對面：微微跟著回中
+    }
+  }
+  const spd = SPEED*0.92*S;                      // 略慢於人類，可被打敗
+  const dx = tx-p.x, dy = ty-p.y;
+  if(Math.abs(dx) > spd) p.x += Math.sign(dx)*spd; else p.x = tx;
+  if(Math.abs(dy) > spd) p.y += Math.sign(dy)*spd; else p.y = ty;
+  p.x = Math.max(COURT.x+4, Math.min(COURT.x+COURT.w-4, p.x));
+  p.y = Math.max(COURT.y+4, Math.min(NET_Y-4, p.y));
+  // 出手
+  if(state===STATE.SERVE && server===2){
+    if(aiServeDelay > 0) aiServeDelay--; else tryHit(p, true);
+  } else {
+    tryHit(p, true);
+  }
+}
+
+function checkBirdEvents(){
+  // 撞網：低空越網失敗
+  const crossingNet = (bird.y-bird.vy < NET_Y) !== (bird.y < NET_Y);
+  if(crossingNet && bird.z < 28*S){
+    // 掛網，由擊球方失分
+    const winner = lastHitter===1 ? 2 : 1;
+    awardPoint(winner, '掛網');
+    return;
+  }
+
+  // 落地
+  if(bird.z <= 0){
+    bird.z = 0;
+    const inX = bird.x>=COURT.x && bird.x<=COURT.x+COURT.w;
+    const inY = bird.y>=COURT.y && bird.y<=COURT.y+COURT.h;
+    const inCourt = inX && inY;
+    const landedUpper = bird.y < NET_Y;  // 落在 P2 半場
+
+    if(!lastHitter){ // 還沒人擊到就落地（發球失誤）
+      awardPoint(server===1?2:1, '發球出界');
+      return;
+    }
+    if(inCourt){
+      // 落在誰半場，對方得分
+      const winner = landedUpper ? 1 : 2;
+      awardPoint(winner, '落地得分');
+    } else {
+      // 出界，擊球方失分
+      const winner = lastHitter===1 ? 2 : 1;
+      awardPoint(winner, '出界');
+    }
+    return;
+  }
+}
+
+// ---- 繪製 ----
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // 背景（不受震動影響，避免露邊）
+  ctx.fillStyle = '#13402a';
+  ctx.fillRect(0,0,W,H);
+
+  // 螢幕震動
+  ctx.save();
+  if(shake>0) ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+
+  // 球場底色
+  ctx.fillStyle = '#1c6b41';
+  ctx.fillRect(COURT.x, COURT.y, COURT.w, COURT.h);
+
+  // 場邊觀眾
+  drawCrowd();
+
+  // 場線
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 2*S;
+  ctx.strokeRect(COURT.x, COURT.y, COURT.w, COURT.h);
+  // 中線（左右發球區）
+  ctx.beginPath();
+  ctx.moveTo(W/2, COURT.y); ctx.lineTo(W/2, COURT.y+COURT.h);
+  ctx.stroke();
+  // 前發球線
+  const fl = 58*S;
+  ctx.beginPath();
+  ctx.moveTo(COURT.x, NET_Y-fl); ctx.lineTo(COURT.x+COURT.w, NET_Y-fl);
+  ctx.moveTo(COURT.x, NET_Y+fl); ctx.lineTo(COURT.x+COURT.w, NET_Y+fl);
+  ctx.stroke();
+  // 雙打邊線
+  const dl = 30*S;
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.beginPath();
+  ctx.moveTo(COURT.x+dl, COURT.y); ctx.lineTo(COURT.x+dl, COURT.y+COURT.h);
+  ctx.moveTo(COURT.x+COURT.w-dl, COURT.y); ctx.lineTo(COURT.x+COURT.w-dl, COURT.y+COURT.h);
+  ctx.stroke();
+
+  // 網子
+  drawNet();
+
+  // 發球指示箭頭
+  if(state===STATE.SERVE && p1 && p2) drawServeArrow();
+
+  // 羽球殘影
+  drawTrail();
+
+  // 玩家（含陰影）
+  if(p2) drawPlayer(p2);
+  if(p1) drawPlayer(p1);
+
+  // 羽球
+  if(bird.alive || state===STATE.POINT) drawBird();
+
+  // 粒子
+  drawParticles();
+
+  // 浮動文字（世界座標）
+  drawFloats();
+
+  ctx.restore(); // 結束震動位移
+
+  // ---- HUD（不受震動）----
+  drawHUD();
+
+  // 得分閃示
+  if(pointFlash>0 && pointText){
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, pointFlash/30);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold ' + Math.round(28*S) + 'px "Arial Black"';
+    ctx.textAlign='center';
+    ctx.fillText(pointText, W/2, H/2);
+    ctx.restore();
+  }
+}
+
+function drawTrail(){
+  for(let i=0;i<trail.length;i++){
+    const t = trail[i];
+    const a = t.life*0.4*(i/trail.length);
+    ctx.fillStyle = t.smash ? 'rgba(255,210,74,'+a+')' : 'rgba(255,255,255,'+a+')';
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, (3*(i/trail.length)+1)*S, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+// 場邊觀眾：上下各一排小點，得分時(crowdEnergy 高)會跳動歡呼
+function drawCrowd(){
+  const cols = ['#e6b35a','#7fb0e0','#e07f9a','#9ad17a','#c79ae0','#e0c97f'];
+  const n = Math.max(14, Math.round(COURT.w/22));
+  const rows = [ {y:COURT.y*0.5}, {y:H-COURT.y*0.5} ];
+  for(const row of rows){
+    for(let i=0;i<n;i++){
+      const x = COURT.x + (i+0.5)*(COURT.w/n);
+      const bounce = crowdEnergy * 6*S * Math.abs(Math.sin(tick*0.3 + i*0.9));
+      ctx.fillStyle = cols[i % cols.length];
+      ctx.globalAlpha = 0.55 + crowdEnergy*0.4;
+      ctx.beginPath();
+      ctx.arc(x, row.y - bounce, 4*S, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawParticles(){
+  for(const p of particles){
+    ctx.globalAlpha = Math.max(0, p.life);
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (3*p.life+0.5)*S, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawFloats(){
+  ctx.textAlign='center';
+  for(const f of floats){
+    ctx.globalAlpha = Math.max(0, f.life);
+    ctx.font = 'bold '+Math.round(f.size*S)+'px "Arial Black"';
+    ctx.lineWidth = 3*S; ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+    ctx.strokeText(f.text, f.x, f.y);
+    ctx.fillStyle = f.color;
+    ctx.fillText(f.text, f.x, f.y);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawServeArrow(){
+  const srv = server===1 ? p1 : p2;
+  const dir = server===1 ? -1 : 1;
+  const a = Math.abs(Math.sin(serveBlink*0.12));
+  ctx.globalAlpha = 0.4 + a*0.5;
+  ctx.fillStyle = server===1 ? '#4ad07a' : '#ff7a7a';
+  const bx = srv.x, by = srv.y + dir*30*S;
+  ctx.beginPath();
+  ctx.moveTo(bx, by + dir*10*S);
+  ctx.lineTo(bx-7*S, by - dir*2*S);
+  ctx.lineTo(bx+7*S, by - dir*2*S);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawHUD(){
+  // 連拍計數（左上）
+  ctx.textAlign='left';
+  ctx.font = 'bold '+Math.round(14*S)+'px "Arial Black"';
+  if(state===STATE.RALLY && rally>0){
+    ctx.fillStyle = rally>=5 ? '#ffd24a' : '#cfe';
+    ctx.fillText('連拍 '+rally, COURT.x+6, COURT.y+22*S);
+  }
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = 'bold '+Math.round(12*S)+'px "Arial Black"';
+  ctx.fillText('最佳連拍 '+bestRally, COURT.x+6, COURT.y+COURT.h-10*S);
+  // 靜音狀態（右上）
+  ctx.textAlign='right';
+  ctx.fillStyle = soundOn ? 'rgba(255,255,255,0.45)' : 'rgba(255,120,120,0.7)';
+  ctx.fillText(soundOn?'♪ 音效開 (M)':'✕ 靜音 (M)', COURT.x+COURT.w-6, COURT.y+22*S);
+
+  // 賽末點提示
+  const mp1 = score1>=20 && score1-score2>=1 && state!==STATE.OVER;
+  const mp2 = score2>=20 && score2-score1>=1 && state!==STATE.OVER;
+  if(mp1 || mp2){
+    ctx.textAlign='center';
+    ctx.font = 'bold '+Math.round(20*S)+'px "Arial Black"';
+    const a = 0.6 + 0.4*Math.abs(Math.sin(serveBlink*0.15));
+    ctx.globalAlpha = a;
+    ctx.fillStyle = mp1 ? '#4ad07a' : '#ff7a7a';
+    ctx.fillText('賽　末　點', W/2, COURT.y+24*S);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function drawNet(){
+  const ny = NET_Y, h = 3*S;
+  // 網帶
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillRect(COURT.x, ny-h, COURT.w, h*2);
+  // 網格
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1;
+  for(let x=COURT.x; x<=COURT.x+COURT.w; x+=12*S){
+    ctx.beginPath(); ctx.moveTo(x, ny-h); ctx.lineTo(x, ny+h); ctx.stroke();
+  }
+  // 網柱
+  ctx.fillStyle = '#ddd';
+  ctx.fillRect(COURT.x-3*S, ny-7*S, 6*S, 14*S);
+  ctx.fillRect(COURT.x+COURT.w-3*S, ny-7*S, 6*S, 14*S);
+}
+
+function drawPlayer(p){
+  const R = 14*S;
+  // 陰影
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y+R, R*1.15, R*0.5, 0, 0, Math.PI*2);
+  ctx.fill();
+  // 身體
+  ctx.fillStyle = p.color;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, R, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = p.dark; ctx.lineWidth=3*S; ctx.stroke();
+  // 球拍（揮拍時甩出）
+  const dir = p.isP1 ? -1 : 1;
+  let rax = p.x + R*1.15;
+  let ray = p.y + dir*4*S;
+  if(p.swingTimer>0){
+    const t = p.swingTimer/8;
+    rax = p.x + R*1.15 - t*8*S;
+    ray = p.y + dir*(4 + t*22)*S;
+  }
+  ctx.strokeStyle = '#eee'; ctx.lineWidth=3*S;
+  ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(rax, ray); ctx.stroke();
+  ctx.beginPath(); ctx.arc(rax, ray, 6*S, 0, Math.PI*2);
+  ctx.strokeStyle='#fff'; ctx.lineWidth=2*S; ctx.stroke();
+}
+
+function drawBird(){
+  // 陰影（落點）
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  const sr = (6 - Math.min(4, bird.z*0.015))*S;
+  ctx.ellipse(bird.x, bird.y, Math.max(2,sr), Math.max(1.5,sr*0.5), 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // 羽球本體（畫在高度位置：y 往上偏移代表 z）
+  const by = bird.y - bird.z*0.55;
+  // 羽毛裙
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.beginPath();
+  ctx.moveTo(bird.x, by-7*S);
+  ctx.lineTo(bird.x-6*S, by+5*S);
+  ctx.lineTo(bird.x+6*S, by+5*S);
+  ctx.closePath();
+  ctx.fill();
+  // 球頭
+  ctx.fillStyle = '#f2f2f2';
+  ctx.beginPath();
+  ctx.arc(bird.x, by+5*S, 3.5*S, 0, Math.PI*2);
+  ctx.fill();
+  ctx.strokeStyle = '#bbb'; ctx.lineWidth=1; ctx.stroke();
+}
+
+// ---- 主迴圈 ----
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.getElementById('soloBtn').onclick = ()=> startGame('solo');
+document.getElementById('duoBtn').onclick  = ()=> startGame('duo');
+document.getElementById('howBtn').onclick  = ()=> showPanel('tutorial');
+document.getElementById('backBtn').onclick = ()=> showPanel('home');
+document.getElementById('replayBtn').onclick = ()=> startGame(mode);
+document.getElementById('switchBtn').onclick = ()=> startGame(mode==='solo' ? 'duo' : 'solo');
+
+// ---- 觸控操作（手機/平板）----
+function canvasPos(t){
+  const r = canvas.getBoundingClientRect();
+  return { x:(t.clientX-r.left)*(W/r.width), y:(t.clientY-r.top)*(H/r.height) };
+}
+function handleTouches(e){
+  if(!p1) return;
+  e.preventDefault();
+  p1.touch = null;
+  if(!aiActive) p2.touch = null;
+  for(const t of e.touches){
+    const pos = canvasPos(t);
+    if(pos.y >= NET_Y) p1.touch = pos;            // 下半場 → 玩家1
+    else if(!aiActive) p2.touch = pos;            // 上半場 → 玩家2（雙人）
+  }
+}
+['touchstart','touchmove','touchend','touchcancel'].forEach(ev=>
+  canvas.addEventListener(ev, handleTouches, {passive:false}));
+
+// 觸控裝置：套用 touch 樣式（CSS 切換鍵盤/觸控教學），並改底部提示
+if(window.matchMedia && window.matchMedia('(hover:none) and (pointer:coarse)').matches){
+  document.body.classList.add('touch');
+  document.getElementById('hint').textContent = '手指在自己半場拖動移球 · 靠近自動擊球';
+} else {
+  document.getElementById('hint').innerHTML = '<b>P1</b> WASD＋空白　·　<span style="color:#ff7a7a"><b>P2</b> 方向鍵＋Enter</span>';
+}
+
+// 視窗尺寸/旋轉變更時重新排版
+window.addEventListener('resize', ()=>{ layout(); });
+window.addEventListener('orientationchange', ()=> setTimeout(layout, 200));
+
+layout();   // 初始排版
+loop();
+</script>
+</body>
+</html>
